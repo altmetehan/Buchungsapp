@@ -1,0 +1,45 @@
+/**
+ * Objekte.css
+ * -----------
+ * Styles nur für die Objektverwaltung: Spaltenbreiten der Tabelle und
+ * die Preis-Spalte (rechtsbündig, damit Beträge sauber untereinander
+ * stehen).
+ */
+
+/* Spaltenbreiten: ID | Name | Beschreibung | Preis | Aktionen */
+.grid-objekte {
+    display: grid;
+    grid-template-columns: 80px 200px 220px 1fr 180px 120px;
+}
+
+.object-id {
+    font-family: monospace;
+    color: #8e8e93;
+}
+
+.object-name {
+    font-weight: 700;
+    color: #000000;
+}
+
+.object-desc {
+    color: #71717a;
+    font-weight: 400;
+    padding-right: 40px;
+}
+
+.object-preis-header,
+.object-preis {
+    text-align: right;
+    padding-right: 24px;
+}
+
+.object-preis-header {
+    font-weight: 500;
+    color: #8e8e93;
+}
+
+.object-preis {
+    font-weight: 700;
+    color: #111111;
+}

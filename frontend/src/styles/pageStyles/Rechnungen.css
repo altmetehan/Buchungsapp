@@ -1,0 +1,69 @@
+/**
+ * Rechnungen.css
+ * --------------
+ * Styles nur für die Rechnungen-Seite: Spaltenbreiten der Tabelle sowie
+ * die etwas dezenteren Monats-/Jahres-Dropdowns (dunklerer Hintergrund
+ * + mehr sichtbare Einträge als das Standard-Dropdown aus
+ * shared-ui.css).
+ */
+
+.rechnungen-container {
+    width: 100%;
+}
+
+.rechnungen-table-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #8e8e93;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 8px;
+    margin-bottom: 10px;
+    padding-left: 4px;
+}
+
+/* Spaltenbreiten: Rechnungsnummer | Datum | Objekt | Gast | Betrag */
+.grid-rechnungen {
+    grid-template-columns: 130px 140px 160px 220px 120px 1fr;
+}
+
+.res-datum,
+.res-objekt {
+    color: #111111;
+}
+
+.res-gast,
+.res-betrag {
+    font-weight: 700;
+    color: #000000;
+}
+
+/* Feintuning des gemeinsamen Dropdowns (Monat/Jahr) nur für diese
+   Seite: dezenter grauer Hintergrund statt weiß, und mehr Platz für die
+   lange Monatsliste. */
+.rechnungen-container .select-dropdown-trigger {
+    background-color: #00000010;
+}
+
+.rechnungen-container .select-dropdown-list {
+    max-height: 500px;
+}
+
+@media (max-width: 600px) {
+    /* Der innere Flex-Container mit Monat- und Jahr-Dropdown (siehe
+       Rechnungen.jsx) bleibt bewusst NEBENEINANDER stehen (beide sind
+       schon recht kompakt und ergeben zusammen ein "Monat/Jahr"-Paar),
+       bekommt aber die volle Breite der (jetzt gestapelten) Filterleiste,
+       statt rechtsbündig verloren dazustehen. */
+    .rechnungen-container .filter-bar > div {
+        width: 100%;
+    }
+
+    .rechnungen-container .filter-bar > div > div {
+        flex: 1;
+    }
+
+    .rechnungen-container .select-dropdown-trigger {
+        min-width: 0 !important;
+    }
+}

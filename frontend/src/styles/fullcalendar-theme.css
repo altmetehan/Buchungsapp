@@ -1,0 +1,183 @@
+/**
+ * fullcalendar-theme.css
+ * -----------------------
+ * Passt die generischen FullCalendar-Styles an unser Beckhoff-Design an
+ * (Schrift, Rahmenfarben, Buttons, Events). Diese Regeln sind bewusst
+ * NICHT auf einen bestimmten Container beschränkt, weil FullCalendar an
+ * drei Stellen in der App auftaucht: im großen Kalender (Kalender.jsx),
+ * im Mini-Kalender-Popup (Dashboard.jsx) und im Sidebar-Kalender des
+ * Buchungs-Assistenten (Buchen.jsx). Jede dieser Seiten bindet diese
+ * Datei deshalb selbst ein.
+ *
+ * Seiten-spezifisches Kalender-Feintuning (z.B. die rote
+ * Auswahl-Markierung im Buchungs-Assistenten) steht NICHT hier, sondern
+ * in der jeweiligen Seiten-CSS-Datei.
+ */
+
+/* Schriftarten und Grunddesign anpassen */
+.fc {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+    --fc-border-color: #e4e4e7 !important; /* Passt die Gitterlinien an unsere Tabellenränder an */
+    --fc-today-bg-color: #ff000020 !important; /* Ganz zartes Rot für den heutigen Tag */
+}
+
+/* Die Kopfzeile des Kalenders (Monatsname & Buttons) */
+.fc .fc-toolbar-title {
+    font-size: 18px !important;
+    font-weight: bold !important;
+    color: #111111 !important;
+}
+
+/* Knöpfe im Kalender an unseren .btn-outline Style anpassen */
+.fc .fc-button-primary {
+    background-color: #ffffff !important;
+    border: 1px solid #e4e4e7 !important;
+    color: #3f3f46 !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+    text-transform: capitalize !important;
+    box-shadow: none !important;
+}
+
+.fc .fc-button-primary:hover {
+    background-color: #f4f4f5 !important;
+    border-color: #d4d4d8 !important;
+}
+
+.fc .fc-button-primary:disabled {
+    background-color: #ffffff !important;
+    opacity: 0.4 !important;
+}
+
+/* Event-Balken Styling (Abrundung und Padding) - das sind die farbigen
+   Buchungs-Balken im Kalender. */
+.fc-event {
+    border-radius: 4px !important;
+    padding: 2px 6px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    /* Default Farben */
+    background-color: #71717a;
+    border-color: #52525b;
+}
+
+/* =========================================================
+   ZENTRALE RESSOURCEN-FARBEN (Wohnungen & Fahrzeuge)
+   ========================================================= */
+
+/* 1. CSS-Variablen pro Objekt-Typ definieren */
+.resource-wohnung-1 {
+  --res-bg: #e30000;      /* Beckhoff Rot */
+  --res-border: #b80000;
+}
+
+.resource-wohnung-2 {
+  --res-bg: #3b82f6;      /* Blau */
+  --res-border: #1d4ed8;
+}
+
+.resource-wohnung-3 {
+  --res-bg: #10b981;      /* Grün */
+  --res-border: #047857;
+}
+
+.resource-vito-bus {
+  --res-bg: #f59e0b;      /* Orange / Amber */
+  --res-border: #b45309;
+}
+
+.resource-forum-beckhoff {
+  --res-bg: #ad9366;      /* Orange / Amber */
+  --res-border: #918167;
+}
+
+/* Rückfalloption für unbekannte Objekte */
+.resource-default {
+  --res-bg: #71717a;
+  --res-border: #52525b;
+}
+
+/* 2. FullCalendar-Events automatisch einfärben */
+.fc-event.resource-wohnung-1,
+.fc-event.resource-wohnung-2,
+.fc-event.resource-wohnung-3,
+.fc-event.resource-vito-bus,
+.fc-event.resource-forum-beckhoff,
+.fc-event.resource-default {
+  background-color: var(--res-bg) !important;
+  border-color: var(--res-border) !important;
+  color: #ffffff !important;
+}
+
+/* 3. Legenden-Indikatoren (Farbkreis im Kalender) */
+.calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e4e4e7;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #3f3f46;
+}
+
+.resource-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: var(--res-bg);
+  border: 1px solid var(--res-border);
+}
+
+.fc-daygrid-event {
+  white-space: normal !important;
+  align-items: flex-start !important;
+}
+
+.fc-event-main,
+.fc-event-title {
+  white-space: normal !important;
+  word-break: break-word !important;
+  line-height: 1.25 !important;
+  padding: 1px 0 !important;
+}
+
+
+/* ==========================================================================
+   RESPONSIVE: TABLET & HANDY
+   ========================================================================== */
+@media (max-width: 700px) {
+  /* FullCalendar ordnet "prev/next/today" links und den Titel mittig
+     standardmäßig in EINER Zeile an - auf einem Handy ist dafür meist
+     nicht genug Platz. flex-wrap lässt den Titel bei Bedarf in eine
+     eigene Zeile rutschen, statt Buttons/Titel zu überlappen. */
+  .fc .fc-toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center !important;
+  }
+
+  .fc .fc-toolbar-title {
+    font-size: 16px !important;
+  }
+
+  .fc .fc-button {
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+  }
+
+  /* Legende (Objekt-Farben) darf auf schmalen Screens enger stehen. */
+  .calendar-legend {
+    gap: 10px;
+  }
+}

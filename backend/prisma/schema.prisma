@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Buchungen {
+  id               Int                @id @default(autoincrement())
+  gast_id          Int
+  objekt_id        Int
+  objekt_id_2      Int?
+  anreise          String
+  abreise          String
+  anreise_zeit     String?
+  abreise_zeit     String?
+  erwachsene       Int?
+  kinder           Int?
+  preis            Float
+  infos            String?
+  geloescht_am     DateTime?
+  ObjekteZusatz    Objekte?           @relation("BuchungZusatzobjekt", fields: [objekt_id_2], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Objekte          Objekte            @relation("BuchungHauptobjekt", fields: [objekt_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Gaeste           Gaeste             @relation(fields: [gast_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Preisanpassungen Preisanpassungen[]
+  Rechnungen       Rechnungen[]
+}
+
+model Gaeste {
+  id           Int         @id @default(autoincrement())
+  name         String
+  email        String?
+  telnr        String?
+  strasse      String?
+  hnr          String?
+  plz          String?
+  stadt        String?
+  land         String?     @default("Österreich")
+  geloescht_am DateTime?
+  Buchungen    Buchungen[]
+}
+
+model Objekte {
+  id                   Int         @id @default(autoincrement())
+  name                 String
+  beschreibung         String?
+  preis                Float
+  kennzeichen          String?
+  geloescht_am         DateTime?
+  AnfrageZusatzobjekte Anfragen[]  @relation("AnfrageZusatzobjekt")
+  AnfrageHauptobjekte  Anfragen[]  @relation("AnfrageHauptobjekt")
+  ZusatzBuchungen      Buchungen[] @relation("BuchungZusatzobjekt")
+  Buchungen            Buchungen[] @relation("BuchungHauptobjekt")
+}
+
+model Rechnungen {
+  id               Int       @id @default(autoincrement())
+  buchung_id       Int
+  rechnungs_nummer String
+  rechnungs_datum  String
+  Buchungen        Buchungen @relation(fields: [buchung_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model Einstellungen {
+  id                      Int     @id @default(autoincrement())
+  checkin_zeit            String? @default("15:00")
+  checkout_zeit           String? @default("11:00")
+  mindest_naechte_wohnung Int?    @default(2)
+  kombirabatt             Float?  @default(0)
+}
+
+model Preisanpassungen {
+  id           Int       @id @default(autoincrement())
+  buchung_id   Int
+  alter_betrag Float
+  neuer_betrag Float
+  grund        String
+  erstellt_am  DateTime? @default(now())
+  Buchungen    Buchungen @relation(fields: [buchung_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model AnfrageGaeste {
+  id          Int        @id @default(autoincrement())
+  name        String
+  email       String?    @unique(map: "sqlite_autoindex_AnfrageGaeste_1")
+  telnr       String?
+  strasse     String?
+  hnr         String?
+  plz         String?
+  stadt       String?
+  land        String?    @default("Österreich")
+  erstellt_am DateTime?  @default(now())
+  Anfragen    Anfragen[]
+}
+
+model Anfragen {
+  id              Int           @id @default(autoincrement())
+  anfrage_gast_id Int
+  objekt_id       Int
+  objekt_id_2     Int?
+  anreise         String
+  abreise         String
+  anreise_zeit    String?
+  abreise_zeit    String?
+  erwachsene      Int?
+  kinder          Int?
+  infos           String?
+  status          String?       @default("offen")
+  ablehnungsgrund String?
+  erstellt_am     DateTime?     @default(now())
+  angenommen_am   DateTime?
+  abgelehnt_am    DateTime?
+  ObjekteZusatz   Objekte?      @relation("AnfrageZusatzobjekt", fields: [objekt_id_2], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Objekte         Objekte       @relation("AnfrageHauptobjekt", fields: [objekt_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  AnfrageGaeste   AnfrageGaeste @relation(fields: [anfrage_gast_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}

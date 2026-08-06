@@ -1,0 +1,271 @@
+/**
+ * layout.css
+ * ----------
+ * Das grobe Grundgerüst der App: die Sidebar links (Logo, Navigation,
+ * Ein-/Ausklapp-Knopf) und der Hauptbereich rechts, in dem jeweils eine
+ * Unterseite (Dashboard, Buchen, ...) angezeigt wird. Wird nur einmal
+ * zentral von App.jsx eingebunden, weil dieses Grundgerüst nur dort
+ * vorkommt.
+ */
+
+/* --- APP-GRUNDGERÜST (Sidebar + Hauptbereich nebeneinander) --- */
+.app-container {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+}
+
+.main-content {
+    flex-grow: 1;
+    padding: 40px 60px;
+    overflow-y: auto;
+}
+
+.main-content h2 {
+    font-size: 28px;
+    margin-bottom: 8px;
+}
+
+.main-content p {
+    color: #808080;
+    font-size: 14px;
+}
+
+
+/* --- SIDEBAR (Menü links) --- */
+.sidebar {
+    width: 260px;
+    background-color: #f8f9fa;
+    border-right: 1px solid #e4e4e7;
+    display: flex;
+    flex-direction: column;
+    padding: 40px 24px;
+    transition: width 0.3s ease, padding 0.3s ease;
+    overflow: hidden;
+}
+
+/* Eingeklappter Zustand: nur noch das Logo/der Umschalt-Knopf sichtbar */
+.sidebar.collapsed {
+    width: 70px;
+    min-width: 70px;
+    padding: 40px 0;
+    align-items: center;
+}
+
+.sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 40px;
+    padding: 0 4px;
+}
+
+.sidebar.collapsed .sidebar-header {
+    justify-content: center;
+    margin-bottom: 0;
+}
+
+/* Der Drei-Striche-Knopf zum Ein-/Ausklappen der Sidebar */
+.toggle-button {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 8px;
+    border-radius: 6px;
+    transition: background-color 0.2s;
+}
+
+.toggle-button .bar {
+    display: block;
+    width: 22px;
+    height: 2px;
+    background-color: #18181b;
+    border-radius: 2px;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+}
+
+.logo-img {
+    max-width: 140px;
+    height: auto;
+    display: block;
+}
+
+.nav-links {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex-grow: 1;
+}
+
+
+/* Ein einzelner Menüpunkt (Dashboard, Buchen, Reservierungen, ...) */
+.nav-button {
+    text-align: left;
+    font-size: 16px;
+    padding: 12px 16px;
+    color: #71717a;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    background: none;
+    font-family: inherit;
+    white-space: nowrap;
+}
+
+.bullet-dot {
+    color: #71717a;
+    font-size: 20px;
+    line-height: 0;
+}
+
+.nav-button:hover {
+    background-color: #e4e4e7;
+    color: #18181b;
+    text-decoration: none;
+}
+
+.nav-button:hover .bullet-dot {
+    color: #18181b;
+}
+
+/* Menüpunkt der gerade geöffneten Seite (Beckhoff-Rot) */
+.nav-button.active {
+    background-color: #ff000025;
+    color: #e30000;
+    font-weight: bold;
+}
+
+.nav-button.active .bullet-dot {
+    color: #e30000;
+}
+
+.nav-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Sektions-Überschriften (ÜBERSICHT, VORGÄNGE, STAMMDATEN) */
+.nav-section-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #a1a1aa;
+    margin-left: 2px;
+}
+
+/* Dezente Trennlinie zwischen den Gruppen */
+.nav-divider {
+    height: 1px;
+    background-color: #e4e4e7;
+    margin: 10px 4px;
+}
+
+.sidebar.collapsed .nav-divider {
+    width: 32px;
+    margin: 10px auto;
+}
+
+/* --- FOOTER (Ganz unten in der Sidebar: Einstellungen & Profil) --- */
+.sidebar-footer {
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid #e4e4e7;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.user-profile {
+    font-size: 12px;
+    color: #a1a1aa;
+    text-align: center;
+    padding-top: 4px;
+}
+
+
+/* ==========================================================================
+   RESPONSIVE: TABLET (HOCH- & QUERFORMAT)
+   ==========================================================================
+   Grundprinzip: die Sidebar "schiebt" den Hauptinhalt nur noch auf echten
+   Desktop-Screens zur Seite (wie bisher). Bis 1200px Breite - das deckt
+   iPad sowohl im Hoch- (~820px) als auch im Querformat (~1024-1194px) ab -
+   wird sie stattdessen zu einem fixen Overlay, das ÜBER dem Inhalt liegt
+   und sich per Backdrop-Klick wieder schließen lässt. Ohne das würde ein
+   260px breiter Sidebar-Balken bei aufgeklapptem Zustand auf einem iPad
+   im Querformat den ganzen Seiteninhalt zusammenquetschen (Karten/Tabellen
+   wirken dann winzig) - mit dem Overlay bleibt der Inhalt in seiner vollen,
+   gewohnten Desktop-Breite, die Sidebar legt sich einfach darüber.
+   Der abgedunkelte Hintergrund (.mobile-sidebar-backdrop) wird in
+   AdminApp.jsx/PortalApp.jsx zusätzlich ins JSX gerendert. */
+.mobile-sidebar-backdrop {
+    display: none; /* Auf Desktop komplett aus dem Layout raus - blockiert dort keine Klicks */
+}
+
+@media (max-width: 1200px) {
+    .mobile-sidebar-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background-color: rgba(0, 0, 0, 0.45);
+        z-index: 1500; /* unter der Sidebar (2000), aber über allem anderen */
+    }
+
+    /* Animationen & Breitenänderungen auf Mobil/Tablet komplett deaktivieren */
+    .sidebar {
+        transition: none !important; /* Verhindert das Zusammentauchen/Bewegen der Kästchen */
+    }
+
+    /* Die AUSGEKLAPPTE Sidebar wird fix positioniert (liegt über dem
+       Inhalt) statt wie bisher als normales Flex-Kind Platz wegzunehmen. */
+    .sidebar:not(.collapsed) {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        width: 280px;        /* Feste Breite – bewegt sich beim Zoomen nicht mit */
+        min-width: 280px;
+        z-index: 2000;
+        box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
+    }
+
+    /* Die EINGEKLAPPTE Sidebar auf Tablet/Handy */
+    .sidebar.collapsed {
+        /* Falls der Burger-Knopf auf mobilen Geräten oben fixiert sein soll, 
+           können Sie hier 'position: absolute' nutzen. Ansonsten bleibt 
+           sie wie von Ihnen definiert im Fluss. */
+        transition: none !important;
+    }
+
+    .main-content {
+        padding: 28px 20px;
+        overflow-x: hidden; /* Sicherheitsnetz: nichts soll je seitlich aus dem Screen laufen können */
+    }
+}
+
+@media (max-width: 600px) {
+    /* Auf echten Handy-Breiten darf die ausgeklappte Sidebar ruhig die
+       komplette Breite einnehmen - wirkt dann wie ein echtes App-Menü
+       statt wie ein schmaler, abgeschnittener Streifen. */
+    .sidebar:not(.collapsed) {
+        width: 85vw;
+        min-width: 0;
+    }
+
+    .main-content {
+        padding: 20px 14px;
+    }
+
+    .logo-img {
+        max-width: 110px;
+    }
+}

@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "3001:3001"
+    environment:
+      # Pfad INNERHALB des Containers - zeigt auf das Volume, damit die
+      # SQLite-Datei einen Neustart/Rebuild überlebt.
+      DATABASE_URL: "file:/app/prisma/data/test.db"
+    volumes:
+      - db-data:/app/prisma/data
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+volumes:
+  db-data:

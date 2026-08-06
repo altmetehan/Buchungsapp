@@ -1,0 +1,114 @@
+/**
+ * toast.css
+ * ---------
+ * Styles nur für die Toast-Benachrichtigung (Erfolg/Fehler), die die
+ * früheren Browser-alert()-Popups ersetzt. Grün/Rot bewusst dieselben
+ * Farben wie .tag.frei / .tag.belegt aus shared-ui.css, damit es sich
+ * ins bestehende Farbschema einfügt statt eine neue Farbsprache
+ * einzuführen.
+ */
+
+.toast-container {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    /* Der Container selbst blockiert keine Klicks - nur der Toast drin */
+    pointer-events: none;
+}
+
+.toast {
+    pointer-events: auto;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    min-width: 240px;
+    max-width: 360px;
+    background-color: #ffffff;
+    border-radius: 12px;
+    padding: 16px 18px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+    border-left: 4px solid transparent;
+    animation: toast-slide-in 0.25s ease-out;
+}
+
+@keyframes toast-slide-in {
+    from {
+        opacity: 0;
+        transform: translateX(24px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.toast--success {
+    border-left-color: #2b9348;
+}
+
+.toast--error {
+    border-left-color: #e30000;
+}
+
+.toast-icon {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: bold;
+    color: #ffffff;
+    margin-top: 1px;
+}
+
+.toast--success .toast-icon {
+    background-color: #2b9348;
+}
+
+.toast--error .toast-icon {
+    background-color: #e30000;
+}
+
+.toast-message {
+    flex-grow: 1;
+    font-size: 14px;
+    line-height: 1.4;
+    color: #111111;
+    margin: 2px 0 0 0;
+}
+
+.toast-close {
+    flex-shrink: 0;
+    color: #a1a1aa;
+    font-size: 18px;
+    line-height: 1;
+    padding: 0 2px;
+    transition: color 0.15s ease;
+}
+
+.toast-close:hover {
+    color: #111111;
+}
+
+@media (max-width: 480px) {
+    /* Auf sehr schmalen Handys füllt der Toast lieber die Breite (mit
+       etwas Seitenabstand) statt mit fester min-width von 240px in
+       Kombination mit right:24px eventuell links über den Rand hinauszuragen. */
+    .toast-container {
+        top: 12px;
+        right: 12px;
+        left: 12px;
+    }
+
+    .toast {
+        min-width: 0;
+        max-width: 100%;
+    }
+}

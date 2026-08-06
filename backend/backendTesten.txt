@@ -1,0 +1,10 @@
+curl -X POST /api/gaeste \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Max Mustermann","email":"max@test.at","telnr":"0664123456","strasse":"Teststraße","hnr":"5","plz":"6850","stadt":"Dornbirn","land":"Österreich"}'
+
+
+  curl -X PUT /api/gaeste/13 \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Marco De Basque"}'
+
+  curl -X DELETE /api/gaeste/3

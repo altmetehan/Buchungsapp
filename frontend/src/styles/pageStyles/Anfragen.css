@@ -1,0 +1,418 @@
+/**
+ * Anfragen.css
+ * ------------
+ * Styles für den Admin-Bereich "Anfragen" inklusive voll-responsiver
+ * Anpassungen für Mobilgeräte.
+ */
+
+.anfragen-container {
+    width: 100%;
+}
+
+/* Lade- & Fehleranzeigen */
+.anfragen-loading {
+    padding: 24px;
+}
+
+.anfragen-error {
+    padding: 24px;
+    color: #e30000;
+}
+
+/* Suchleiste - volle Breite */
+.search-input-full {
+    width: 100%;
+}
+
+/* Bereichs-Überschrift mit Zähler-Badge */
+.anfragen-section-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #8e8e93;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 32px;
+    margin-bottom: 10px;
+    padding-left: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.anfragen-section-title--secondary {
+    margin-top: 24px;
+}
+
+/* Zähler-Badge (kleine abgerundete Zahl) */
+.section-count-badge {
+    background-color: #e4e4e7;
+    color: #3f3f46;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+/* Stammgast ⭐ Icon in der Zeile */
+.stammgast-star {
+    cursor: help;
+    margin-left: 4px;
+}
+
+/* Spalten: ID | Name | Objekt | Zeitraum | Email | Nachricht | Aktionen */
+.grid-anfragen-offen {
+    display: grid;
+    grid-template-columns: 50px 180px 170px 170px 200px 1fr 110px;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Spalten: ID | Name | Objekt | Zeitraum | Email | Status | Details/Grund */
+.grid-anfragen-entschieden {
+    display: grid;
+    grid-template-columns: 50px 180px 170px 170px 200px 150px 1fr;
+    align-items: center;
+    gap: 10px;
+}
+
+.anfrage-nachricht-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 13px;
+    color: #3f3f46;
+}
+
+.anfrage-nachricht-empty {
+    color: #a1a1aa;
+    font-size: 14px;
+}
+
+.anfrage-grund-text {
+    font-size: 14px;
+    color: #71717a;
+    margin-top: 2px;
+}
+
+.anfrage-grund-text--block {
+    display: block;
+}
+
+.anfrage-grund-text--italic {
+    display: block;
+    font-style: italic;
+}
+
+/* --- ANNEHMEN (Soft-Hover) --- */
+.anfragen-container .btn-outline.btn-annehmen {
+    background-color: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #15803d;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.anfragen-container .btn-outline.btn-annehmen:hover {
+    background-color: #baf0c3; /* Nur etwas kräftigeres Hellgrün */
+    border-color: #86efac;
+    color: #14532d;
+}
+
+/* --- ABLEHNEN (Soft-Hover) --- */
+.anfragen-container .btn-outline.btn-ablehnen {
+    background-color: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #b91c1c;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.anfragen-container .btn-outline.btn-ablehnen:hover {
+    background-color: #fee2e2; /* Nur etwas kräftigeres Hellrot */
+    border-color: #fca5a5;
+    color: #7f1d1d;
+}
+
+/* Status Badges */
+.anfragen-container .tag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 12px;
+    border-radius: 50px;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.2;
+    text-transform: capitalize;
+    white-space: nowrap;
+    width: fit-content;
+}
+
+.anfragen-container .tag.offen {
+    background-color: #dbeafe;
+    color: #1e40af;
+}
+
+.anfragen-container .tag.angenommen {
+    background-color: #80ee7c50;
+    color: #15803d;
+}
+
+.anfragen-container .tag.abgelehnt {
+    background-color: #fee2e2;
+    color: #b91c1c;
+}
+
+/* ==========================================================================
+   MODAL STYLES (OHNE INLINE)
+   ========================================================================== */
+
+.modal-card--sm {
+    max-width: 480px;
+}
+
+/* Stammgast Banner im Details-Modal */
+.stammgast-banner {
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.stammgast-banner--bekannt {
+    background-color: #22c55e15;
+    border: 1px solid #22c55e;
+}
+
+.stammgast-banner--neu {
+    background-color: #00000008;
+    border: 1px solid #e4e4e7;
+}
+
+.stammgast-banner-icon {
+    font-size: 16px;
+}
+
+.stammgast-banner-desc {
+    margin: 0;
+    color: #71717a;
+}
+
+/* Modals Detail-Felder */
+.detail-secondary-text--bold {
+    margin-top: 2px;
+    color: #111827;
+    font-weight: 600;
+}
+
+.detail-secondary-text--bus {
+    margin-top: 4px;
+    color: #e30000;
+    font-weight: 600;
+}
+
+.detail-primary-text--spaced {
+    margin-top: 12px;
+}
+
+.detail-card-block-full--compact {
+    padding: 12px;
+    border-radius: 6px;
+}
+
+.detail-nachricht-text {
+    white-space: pre-wrap;
+    font-size: 14px;
+    font-weight: normal;
+    color: #000000;
+}
+
+.detail-nachricht-text--empty {
+    color: #71717a;
+}
+
+.modal-footer-flex--spaced {
+    margin-top: 24px;
+}
+
+.btn-outline.btn-close-modal {
+    padding: 14px 28px;
+}
+
+.modal-subtext--spaced {
+    margin-top: 8px;
+}
+
+.form-grid--spaced {
+    margin-top: 16px;
+}
+
+.input-group--spaced {
+    margin-top: 16px;
+}
+
+.input-help-text {
+    font-size: 12px;
+    color: #71717a;
+    margin-top: 4px;
+    display: block;
+}
+
+.wizard-actions--spaced {
+    margin-top: 20px;
+}
+
+/* ==========================================================================
+   ANNEHMEN ERFOLGS-MODAL (Haken + PDF Download)
+   ========================================================================== */
+
+.anfragen-success-content {
+    text-align: center;
+    padding: 32px 24px;
+}
+
+.anfragen-success-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background-color: #22c55e;
+    color: #ffffff;
+    font-size: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px auto;
+}
+
+.anfragen-success-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 8px;
+}
+
+.anfragen-success-desc {
+    font-size: 14px;
+    color: #71717a;
+    line-height: 1.5;
+    margin-bottom: 24px;
+}
+
+.anfragen-success-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.anfragen-success-actions .btn-primary {
+    width: 100%;
+    justify-content: center;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.anfragen-success-actions .btn-outline {
+    width: 100%;
+    padding: 12px;
+}
+
+/* ==========================================================================
+   CUSTOM BUTTON COLORS FOR ERFOLGS-MODAL
+   ========================================================================== */
+
+/* Rechnung: Smaragdgrün */
+.btn-primary.rechnung { background-color: #10b981; border-color: #10b981; color: #fff; }
+.btn-primary.rechnung:hover:not(:disabled) { background-color: #059669; }
+
+/* Buchungsbestätigung: Indigo */
+.btn-primary.buchungsbestaetigung { background-color: #645de6; border-color: #645de6; color: #fff; }
+.btn-primary.buchungsbestaetigung:hover:not(:disabled) { background-color: #4338ca; }
+
+.btn-primary.rechnung:active:not(:disabled):not(.disabled) {
+    transform: scale(0.98);
+}
+.btn-primary.buchungsbestaetigung:active:not(:disabled):not(.disabled) {
+    transform: scale(0.98);
+}
+
+/* ==========================================================================
+   RESPONSIVE / MOBILE ANPASSUNGEN
+   ========================================================================== */
+
+@media (max-width: 900px) {
+
+    /* Tabellen auf Tablets & Handys horizonztalkompatibel machen */
+    .grid-anfragen-offen,
+    .grid-anfragen-entschieden {
+        min-width: 820px;
+    }
+
+    .anfragen-container .scroll-box {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Modals auf Tablets/Handys anpassen */
+    .modal-content.modal-details {
+        max-width: 95vw;
+        padding: 16px;
+    }
+
+    .details-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .detail-card-block-full {
+        grid-column: span 1;
+    }
+}
+
+@media (max-width: 600px) {
+    .page-header {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .anfragen-section-title {
+        margin-top: 20px;
+    }
+
+    .modal-footer-flex {
+        flex-direction: column-reverse;
+        gap: 12px;
+    }
+
+    .modal-footer-right {
+        width: 100%;
+        display: flex;
+        gap: 8px;
+    }
+
+    .modal-footer-right button,
+    .btn-close-modal {
+        flex: 1;
+        width: 100%;
+        text-align: center;
+    }
+
+    .wizard-actions {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .wizard-actions button {
+        width: 100%;
+    }
+}

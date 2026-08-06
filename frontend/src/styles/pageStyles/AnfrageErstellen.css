@@ -1,0 +1,75 @@
+/**
+ * AnfrageErstellen.css
+ * ---------------------
+ * Styles nur für die öffentliche Anfrage-Seite. Bewusst schlank
+ * gehalten - der Großteil des Looks (form-card, form-grid, input-group,
+ * availability-box/-row, tag, wizard-actions, btn-primary, ...) kommt
+ * schon aus shared-ui.css bzw. Buchen.css, weil diese Seite optisch an
+ * den Buchungs-Assistenten angelehnt ist, nur eben vereinfacht (kein
+ * mehrstufiger Wizard, keine Uhrzeiten, kein Zusatzobjekt).
+ */
+
+.anfrage-container {
+    width: 100%;
+    max-width: 900px;
+}
+
+.anfrage-section {
+    margin-top: 28px;
+}
+
+.anfrage-section h4 {
+    font-size: 15px;
+    margin-bottom: 12px;
+    color: #111111;
+}
+
+/* Zeigt an, dass ein Objekt aktuell für die gewählte Anfrage markiert ist -
+   dezente rote Umrandung statt eines kompletten Farbwechsels der Zeile. */
+.availability-row.selected {
+    background-color: #ff000008;
+    border-left: 3px solid #e30000;
+}
+
+/* Erfolgs-Box, die nach dem Absenden der Anfrage das Formular ersetzt. */
+.anfrage-success-box {
+    text-align: center;
+    padding: 60px 24px;
+}
+
+.anfrage-success-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background-color: #2b9348;
+    color: #ffffff;
+    font-size: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px auto;
+}
+
+.anfrage-success-box h3 {
+    margin-bottom: 8px;
+}
+
+.anfrage-success-box p {
+    color: #71717a;
+    font-size: 14px;
+    max-width: 420px;
+    margin: 0 auto;
+}
+
+.anfrage-error-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background-color: #ef4444; /* Rot für Fehler */
+    color: #ffffff;
+    font-size: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px auto;
+}

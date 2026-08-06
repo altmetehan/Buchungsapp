@@ -1,0 +1,277 @@
+/**
+ * Dashboard.css
+ * -------------
+ * Styles, die es nur auf dem Dashboard gibt: die Status-Listen für
+ * Wohnungen/Andere Objekte, die "Nächste Ankünfte"-Zeilen und das
+ * kleine Belegungsplan-Popup. Alles Gemeinsame (Buttons, Tags,
+ * card-box, ...) kommt aus styles/shared-ui.css.
+ */
+
+.dashboard-section {
+    margin-top: 40px;
+    width: 100%;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    margin-top: 28px;
+}
+
+.section-header h3 {
+    font-size: 16px;
+    font-weight: bold;
+    color: #111111;
+}
+
+.text-link {
+    color: #e30000;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Flache, dezente Listen-Box direkt auf der Dashboard-Seite - bewusst
+   OHNE Rahmen/Schatten wie .card-box, weil hier mehrere Listen dicht
+   untereinanderstehen. */
+.dashboard-card-list {
+    background-color: #00000010;
+    border-radius: 12px;
+    overflow: hidden;
+    width: 100%;
+}
+
+/* Spaltenbreiten für die Status-Zeilen. Wird sowohl für Wohnungen als
+   auch für Andere Objekte (Bus, Forum, ...) verwendet. */
+.grid-status {
+    grid-template-columns: 240px 280px 1fr 90px;
+    gap: 10px;
+}
+
+.list.row.grid-status.status-belegt {
+    background-color: #e3000020;
+    border-left: 4px solid #ef4444;
+}
+
+/* Spaltenbreiten für die "Nächste Ankünfte"-Zeilen (Wohnungen + Andere Objekte) */
+.grid-arrival {
+    grid-template-columns: 240px 280px 1fr 90px;
+    gap: 10px;
+}
+
+/* Fett gedruckter "Haupttext" einer Zeile (Objektname bzw. Gastname) */
+.row-title,
+.row-guest-name {
+    font-weight: bold;
+    color: #111111;
+}
+
+/* Dezenter grauer "Nebentext" einer Zeile (Gast-Kürzel bzw. Ressource) */
+.row-guest,
+.row-resource {
+    color: #71717a;
+    font-size: 14px;
+}
+
+.row-zusatz-badge {
+    margin-left: 6px;
+    font-weight: 700;
+    color: #e30000;
+}
+
+.arrival-date {
+    text-align: right;
+    font-weight: bold;
+    font-size: 14px;
+    color: #111111;
+}
+
+.arrival-date.highlight-red {
+    color: #e30000;
+}
+
+.sub-date {
+    margin-left: 6px;
+}
+
+/* --- STATUS-ZEILEN STYLES --- */
+.list-row.status-row--belegt {
+  background-color: #e3000020;
+  border-left: 4px solid #ef4444;
+}
+
+.list-row.status-row--frei {
+  background-color: #22c55e15;
+  border-left: 4px solid #22c55e;
+}
+
+.row-guest-zusatz {
+  color: #f59e0b;
+  font-weight: 600;
+  margin-left: 6px;
+}
+
+/* --- DRINGENDE ANKÜNFTE STYLES --- */
+.list-row.arrival-row--dringend {
+  background-color: #e3000020;
+  border-left: 4px solid #ef4444;
+}
+
+.arrival-row--dringend .row-resource,
+.arrival-row--dringend .sub-date {
+  font-weight: 600;
+}
+
+.arrival-row--dringend .row-guest-name,
+.arrival-row--dringend .row-resource {
+  margin-left: -4px;
+}
+
+.row-resource-sub {
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+/* Das kleine Belegungsplan-Popup, das sich öffnet, wenn man auf
+   "Details" bei einem Objekt klickt. */
+.modal-calendar-mini {
+    max-width: 600px;
+    width: 90%;
+    padding: 24px;
+}
+
+.modal-calendar-mini .fc {
+    --fc-border-color: #e4e4e7 !important;
+    font-size: 13px !important; /* Etwas kleinere Schrift für das kompakte Modal */
+}
+
+.modal-calendar-mini .fc .fc-toolbar-title {
+    font-size: 15px !important;
+}
+
+.modal-calendar-mini .fc .fc-button {
+    padding: 4px 8px !important;
+    font-size: 11px !important;
+}
+
+/* ==========================================================================
+   DASHBOARD HEADER ACTIONS & BUTTONS
+   ========================================================================== */
+
+.dashboard-header-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+/* Basis-Styling für den Anfragen-Status-Button */
+.btn-anfragen-status {
+    background-color: #ffffff;
+    border: 1px solid #e4e4e7;
+    color: #71717a;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 13px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-anfragen-status:hover {
+    background-color: #f8f9fa;
+    border-color: #b0b0b5;
+}
+
+/* Zustand: Offene Anfragen vorhanden (Rot hervorgehoben) */
+.btn-anfragen-status--active {
+    background-color: #ff000012;
+    border-color: #e30000;
+    color: #e30000;
+}
+
+.btn-anfragen-status--active:hover {
+    background-color: #ff000020;
+}
+
+/* Pulsierender/Roter Punkt im Button */
+.status-dot-danger {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #e30000;
+    display: inline-block;
+}
+
+/* ==========================================================================
+   STATISTIK-WERTE HERVORHEBUNGEN
+   ========================================================================== */
+
+.stats-value--danger {
+    color: #ef0000;
+}
+
+.stats-value--danger-soft {
+    color: #ef000090;
+}
+
+/* Responsive Anpassung für Header Actions */
+@media (max-width: 600px) {
+    .dashboard-header-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .btn-anfragen-status {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* ==========================================================================
+   RESPONSIVE: TABLET & HANDY
+   ========================================================================== */
+@media (max-width: 900px) {
+    /* Gleiches Prinzip wie bei den "echten" Tabellen (siehe shared-ui.css):
+       horizontales Scrollen statt gequetschter Spalten - .dashboard-card-list
+       ist hier der Container, weil das Dashboard bewusst KEINE .card-box
+       für seine Listen verwendet (siehe Dashboard.css Kommentar oben). */
+    .dashboard-card-list {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .dashboard-card-list [class*="grid-"] {
+        min-width: 640px;
+    }
+
+    /* Der "+ Neue Buchung" Bereich im Seiten-Kopf (Anfragen-Status-Knopf
+       + Haupt-Button) bricht auf schmalen Screens sauber um, statt an
+       den Rand gedrängt zu werden. */
+    .dashboard-header-actions {
+        flex-wrap: wrap;
+        width: 100%;
+    }
+
+    .dashboard-header-actions > * {
+        flex: 1;
+        min-width: 220px;
+    }
+}
+
+@media (max-width: 600px) {
+    /* Die zwei "harten" Trennlinien in der Statistik-Leiste (Objekte
+       gesamt / Wohnungen belegt) ergeben in der 1-spaltigen Mobile-
+       Ansicht (siehe shared-ui.css) keinen Sinn mehr als vertikale Linie -
+       dort übernimmt die generische :not(:last-child)-Regel schon eine
+       untere Trennlinie, deshalb hier die spezifische Klasse zusätzlich
+       überschreiben. */
+    .stats-item--divider {
+        border-right: none;
+    }
+}
