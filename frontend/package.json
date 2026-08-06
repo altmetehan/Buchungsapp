@@ -39,5 +39,8 @@
     "prop-types": "^15.8.1",
     "storybook": "^10.4.6",
     "vite": "^8.1.1"
+  },
+  "prisma": {
+  "seed": "node prisma/seed.js"
   }
 }
