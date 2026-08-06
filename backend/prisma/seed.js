@@ -1,5 +1,15 @@
 import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
+import { PrismaBetterSqlite } from "@prisma/adapter-better-sqlite3";
+import Database from "better-sqlite3";
+
+// Liest den Pfad aus DATABASE_URL ("file:/app/prisma/data/test.db")
+const dbUrl = process.env.DATABASE_URL || "file:./prisma/data/test.db";
+const dbPath = dbUrl.replace(/^file:/, "");
+
+// Adapter für SQLite initialisieren
+const sqlite = new Database(dbPath);
+const adapter = new PrismaBetterSqlite(sqlite);
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
   console.log("🌱 Starte Datenbank-Seeding...");
