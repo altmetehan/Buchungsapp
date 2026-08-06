@@ -236,7 +236,7 @@ export function PortalAnfrageSchritt2({ vm }) {
                 </p>
                 <div className="wizard-actions" style={{ justifyContent: "center", marginTop: 0 }}>
                   <button type="button" className="btn-primary" onClick={vm.handleNeueAnfrage}>
-                    Weitere Anfrage stellen
+                    Zurück zur Startseite
                   </button>
                 </div>
               </>
