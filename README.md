@@ -80,6 +80,7 @@ cd backend
 npm install
 npx prisma generate
 npx prisma db push
+npx prisma db seed
 node src/server.js
 ```
 
