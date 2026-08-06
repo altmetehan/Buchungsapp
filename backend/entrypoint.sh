@@ -1,4 +1,4 @@
 #!/bin/sh
 npx prisma db push
-npx prisma db seed
+node prisma/seed.js
 node src/server.js
