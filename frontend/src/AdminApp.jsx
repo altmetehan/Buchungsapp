@@ -213,7 +213,7 @@ export function AdminApp() {
                 }}
               >
                 <span className="bullet-dot">🌐</span>
-                Gäste Ansicht
+                Zur Gäste-Ansicht
               </NavLink>
             </div>
           </>
