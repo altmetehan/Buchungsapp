@@ -20,7 +20,7 @@ import { Anfragen } from "./pages/Anfragen";
 const ANFRAGEN_API = "/api/anfragen";
 
 /**
- * Gruppierte Menüstruktur für eine saubere visuelle Hierarchie.
+ * Gruppierte Menüstruktur für die Admin-Navigation
  */
 const NAV_SECTIONS = [
   {
@@ -49,17 +49,12 @@ const NAV_SECTIONS = [
 ];
 
 export function AdminApp() {
-  // RESPONSIVE: bis 1200px startet die Sidebar eingeklappt (nur
-  // Logo + Burger-Menü sichtbar), ab 1200px (Desktop) wie bisher
-  // ausgeklappt. Deckt damit auch iPad im Querformat (~1024-1194px) ab.
-  // Ohne das würde die App auf einem Tablet beim allerersten Öffnen
-  // sofort mit einem Vollbild-Menü-Overlay über dem Dashboard starten.
   const [isCollapsed, setIsCollapsed] = useState(
     () => typeof window !== "undefined" && window.innerWidth <= 1200,
   );
   const [offeneAnfragenAnzahl, setOffeneAnfragenAnzahl] = useState(0);
 
-  // ─── ANZAHL DER OFFENEN ANFRAGEN LADEN ───
+  // Anzahl offener Anfragen laden
   const ladeOffeneAnfragenCount = useCallback(async () => {
     try {
       const response = await fetch(ANFRAGEN_API);
@@ -76,19 +71,11 @@ export function AdminApp() {
     ladeOffeneAnfragenCount();
   }, [ladeOffeneAnfragenCount]);
 
-  // Der Server meldet sich aktiv über den WebSocket, sobald irgendwo
-  // eine neue Anfrage reinkommt oder eine bestehende angenommen/
-  // abgelehnt wird - das rote Badge hier in der Sidebar aktualisiert
-  // sich dadurch nahezu in Echtzeit.
+  // Live-Aktualisierung über WebSocket bei Anfragen-Änderungen
   useWebSocket("anfragen:changed", ladeOffeneAnfragenCount);
 
   return (
     <div className="app-container">
-      {/* RESPONSIVE: abgedunkelter Hintergrund hinter der ausgeklappten
-          Sidebar - existiert nur im DOM, während die Sidebar offen ist,
-          und ist per CSS (layout.css) ohnehin nur unter 900px sichtbar.
-          Klick irgendwo daneben schließt das Menü wieder, genau wie man
-          es von mobilen App-Menüs gewohnt ist. */}
       {!isCollapsed && (
         <div className="mobile-sidebar-backdrop" onClick={() => setIsCollapsed(true)} />
       )}
@@ -99,13 +86,13 @@ export function AdminApp() {
               <img src={beckhoffLogo} alt="Beckhoff Logo" className="logo-img" />
             </div>
           )}
-          
-          {/* Drei-Striche-Button mit rotem Counter-Badge (auch bei zugeklappter Sidebar sichtbar) */}
+
+          {/* Menü Toggle Button mit Zähler-Badge */}
           <button
             className="toggle-button"
             onClick={() => setIsCollapsed(!isCollapsed)}
             style={{ position: "relative" }}
-            title={offeneAnfragenAnzahl > 0 ? `${offeneAnfragenAnzahl} offene Anfrage(n)` : "Menü einklappen"}
+            title={offeneAnfragenAnzahl > 0 ? `${offeneAnfragenAnzahl} offene Anfrage(n)` : "Menü umschalten"}
           >
             <span className="bar"></span>
             <span className="bar"></span>
@@ -151,13 +138,6 @@ export function AdminApp() {
                       to={item.path}
                       className="nav-button"
                       style={{ display: "flex", alignItems: "center" }}
-                      // RESPONSIVE: auf Tablet/Handy liegt die Sidebar als
-                      // Overlay über der Seite - nach der Navigation soll
-                      // sie sich von selbst wieder schließen, statt dass
-                      // der Nutzer sie jedes Mal manuell zuklappen muss.
-                      // Auf Desktop (>1200px) greift window.innerWidth hier
-                      // nicht ein, weil die Sidebar dort ohnehin nur Platz
-                      // "verschiebt" statt etwas zu verdecken.
                       onClick={() => {
                         if (window.innerWidth <= 1200) setIsCollapsed(true);
                       }}
@@ -165,7 +145,6 @@ export function AdminApp() {
                       <span className="bullet-dot">•</span>
                       <span style={{ flex: 1 }}>{item.label}</span>
 
-                      {/* Kleines Badge neben dem Menüpunkt "Anfragen" */}
                       {item.path === "/anfragen" && offeneAnfragenAnzahl > 0 && (
                         <span
                           style={{
@@ -198,13 +177,11 @@ export function AdminApp() {
                 <span className="bullet-dot">⚙</span>
                 Einstellungen
               </NavLink>
-              {/* SWITCH BUTTON ZUR GÄSTEANSICHT */}
               <NavLink
                 to="/portal"
                 className="nav-button"
                 style={{
                   marginTop: "6px",
-                  backgroundColor: "#rgba(0, 0, 0, 0.05)",
                   fontWeight: "600",
                   color: "#2563eb",
                 }}

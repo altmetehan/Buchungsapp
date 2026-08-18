@@ -31,8 +31,7 @@
     font-size: 14px;
 }
 
-
-/* --- SIDEBAR (Menü links) --- */
+/* --- SIDEBAR --- */
 .sidebar {
     width: 260px;
     background-color: #f8f9fa;
@@ -45,7 +44,6 @@
     min-width: 260px;
 }
 
-/* Eingeklappter Zustand: nur noch das Logo/der Umschalt-Knopf sichtbar */
 .sidebar.collapsed {
     width: 70px;
     min-width: 70px;
@@ -67,7 +65,6 @@
     margin-bottom: 0;
 }
 
-/* Der Drei-Striche-Knopf zum Ein-/Ausklappen der Sidebar */
 .toggle-button {
     display: flex;
     flex-direction: column;
@@ -103,8 +100,6 @@
     flex-grow: 1;
 }
 
-
-/* Ein einzelner Menüpunkt (Dashboard, Buchen, Reservierungen, ...) */
 .nav-button {
     text-align: left;
     font-size: 16px;
@@ -138,7 +133,6 @@
     color: #18181b;
 }
 
-/* Menüpunkt der gerade geöffneten Seite (Beckhoff-Rot) */
 .nav-button.active {
     background-color: #ff000025;
     color: #e30000;
@@ -155,7 +149,6 @@
     gap: 8px;
 }
 
-/* Sektions-Überschriften (ÜBERSICHT, VORGÄNGE, STAMMDATEN) */
 .nav-section-title {
     font-size: 12px;
     text-transform: uppercase;
@@ -164,7 +157,6 @@
     margin-left: 2px;
 }
 
-/* Dezente Trennlinie zwischen den Gruppen */
 .nav-divider {
     height: 1px;
     background-color: #e4e4e7;
@@ -176,7 +168,7 @@
     margin: 10px auto;
 }
 
-/* --- FOOTER (Ganz unten in der Sidebar: Einstellungen & Profil) --- */
+/* --- FOOTER --- */
 .sidebar-footer {
     margin-top: auto;
     padding-top: 12px;
@@ -186,30 +178,9 @@
     gap: 8px;
 }
 
-.user-profile {
-    font-size: 12px;
-    color: #a1a1aa;
-    text-align: center;
-    padding-top: 4px;
-}
-
-
-/* ==========================================================================
-   RESPONSIVE: TABLET (HOCH- & QUERFORMAT)
-   ==========================================================================
-   Grundprinzip: die Sidebar "schiebt" den Hauptinhalt nur noch auf echten
-   Desktop-Screens zur Seite (wie bisher). Bis 1200px Breite - das deckt
-   iPad sowohl im Hoch- (~820px) als auch im Querformat (~1024-1194px) ab -
-   wird sie stattdessen zu einem fixen Overlay, das ÜBER dem Inhalt liegt
-   und sich per Backdrop-Klick wieder schließen lässt. Ohne das würde ein
-   260px breiter Sidebar-Balken bei aufgeklapptem Zustand auf einem iPad
-   im Querformat den ganzen Seiteninhalt zusammenquetschen (Karten/Tabellen
-   wirken dann winzig) - mit dem Overlay bleibt der Inhalt in seiner vollen,
-   gewohnten Desktop-Breite, die Sidebar legt sich einfach darüber.
-   Der abgedunkelte Hintergrund (.mobile-sidebar-backdrop) wird in
-   AdminApp.jsx/PortalApp.jsx zusätzlich ins JSX gerendert. */
+/* --- RESPONSIVE OVERLAYS --- */
 .mobile-sidebar-backdrop {
-    display: none; /* Auf Desktop komplett aus dem Layout raus - blockiert dort keine Klicks */
+    display: none;
 }
 
 @media (max-width: 1200px) {
@@ -218,45 +189,35 @@
         position: fixed;
         inset: 0;
         background-color: rgba(0, 0, 0, 0.45);
-        z-index: 1500; /* unter der Sidebar (2000), aber über allem anderen */
+        z-index: 1500;
     }
 
-    /* Animationen & Breitenänderungen auf Mobil/Tablet komplett deaktivieren */
     .sidebar {
-        transition: none !important; /* Verhindert das Zusammentauchen/Bewegen der Kästchen */
+        transition: none !important;
     }
 
-    /* Die AUSGEKLAPPTE Sidebar wird fix positioniert (liegt über dem
-       Inhalt) statt wie bisher als normales Flex-Kind Platz wegzunehmen. */
     .sidebar:not(.collapsed) {
         position: fixed;
         top: 0;
         left: 0;
         height: 100vh;
-        width: 280px;        /* Feste Breite – bewegt sich beim Zoomen nicht mit */
+        width: 280px;
         min-width: 280px;
         z-index: 2000;
         box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
     }
 
-    /* Die EINGEKLAPPTE Sidebar auf Tablet/Handy */
     .sidebar.collapsed {
-        /* Falls der Burger-Knopf auf mobilen Geräten oben fixiert sein soll, 
-           können Sie hier 'position: absolute' nutzen. Ansonsten bleibt 
-           sie wie von Ihnen definiert im Fluss. */
         transition: none !important;
     }
 
     .main-content {
         padding: 28px 20px;
-        overflow-x: hidden; /* Sicherheitsnetz: nichts soll je seitlich aus dem Screen laufen können */
+        overflow-x: hidden;
     }
 }
 
 @media (max-width: 600px) {
-    /* Auf echten Handy-Breiten darf die ausgeklappte Sidebar ruhig die
-       komplette Breite einnehmen - wirkt dann wie ein echtes App-Menü
-       statt wie ein schmaler, abgeschnittener Streifen. */
     .sidebar:not(.collapsed) {
         width: 85vw;
         min-width: 0;

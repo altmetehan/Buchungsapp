@@ -4,7 +4,7 @@ import { broadcast } from "../ws.js";
 
 const router = Router();
 
-// GET /api/objekte - nur NICHT gelöschte Objekte
+// GET /api/objekte - Liefert alle nicht-gelöschten Objekte
 router.get("/", async (req, res) => {
   try {
     const objekte = await prisma.objekte.findMany({
@@ -16,6 +16,7 @@ router.get("/", async (req, res) => {
   }
 });
 
+// POST /api/objekte - Neues Objekt erstellen
 router.post("/", async (req, res) => {
   try {
     const neuesObjekt = await prisma.objekte.create({ data: req.body });
@@ -26,6 +27,7 @@ router.post("/", async (req, res) => {
   }
 });
 
+// PUT /api/objekte/:id - Objekt bearbeiten
 router.put("/:id", async (req, res) => {
   try {
     const updated = await prisma.objekte.update({
@@ -39,9 +41,7 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// DELETE /api/objekte/:id - SOFT-Delete, mit derselben Schutzlogik wie
-// bei Gästen: keine aktiven/zukünftigen Buchungen erlaubt (als Haupt-
-// ODER Zusatzobjekt).
+// DELETE /api/objekte/:id - Soft-Delete mit Schutz vor aktiven Buchungen
 router.delete("/:id", async (req, res) => {
   try {
     const objektId = Number(req.params.id);
@@ -55,9 +55,12 @@ router.delete("/:id", async (req, res) => {
 
     const heute = new Date();
     heute.setHours(0, 0, 0, 0);
+
     const parseGerman = (str) => {
-      const [d, m, y] = str.split(".").map(Number);
-      return new Date(y, m - 1, d);
+      if (!str || typeof str !== "string") return new Date(0);
+      const parts = str.split(".").map(Number);
+      if (parts.length !== 3) return new Date(0);
+      return new Date(parts[2], parts[1] - 1, parts[0]);
     };
 
     const hatAktiveBuchung = betroffeneBuchungen.some((b) => parseGerman(b.abreise) >= heute);

@@ -251,8 +251,7 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
     // ── AUTOMATISCHE ABREISE-/RÜCKGABEDATUM-LOGIK ──
     if (field === "anreise" && value) {
       if (stundenbasiert) {
-        // Bei stundenbasierten Objekten: Rückgabedatum ist automatisch derselbe Tag
-        updatedForm.abreise = value;
+        if (updatedForm.abreise < updatedForm.anreise) updatedForm.abreise = value;
       }
     }
 

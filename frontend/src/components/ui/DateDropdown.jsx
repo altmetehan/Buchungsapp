@@ -25,12 +25,10 @@ export function DateDropdown({
   disabled = false,
   minDate,
   maxDate,
-  exclusiveMin = false,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Aktuell angezeigter Monat im Kalender
   const [viewDate, setViewDate] = useState(() => {
     if (value) {
       const [y, m] = value.split("-").map(Number);
@@ -187,7 +185,6 @@ export function DateDropdown({
 
           <div className="date-dropdown-grid">
             {calendarDays.map((d, index) => {
-              // Klassen dynamisch zusammenbauen
               const classNames = ["date-dropdown-day"];
               if (!d.isCurrentMonth) classNames.push("other-month");
               if (d.disabled) classNames.push("disabled");

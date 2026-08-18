@@ -5,41 +5,31 @@ import { broadcast } from "../ws.js";
 
 const router = Router();
 
-// Eine Anfrage verknüpft jetzt den Anfragen-Gast (AnfrageGaeste)
-// sowie Haupt- und Zusatzobjekt.
+// Eine Anfrage verknüpft den Anfragen-Gast (AnfrageGaeste) sowie Haupt- und Zusatzobjekt
 const MIT_OBJEKTEN_UND_ANFRAGE_GAST = {
   include: { AnfrageGaeste: true, Objekte: true, ObjekteZusatz: true },
 };
 
-// ─── DATUMS-/ÜBERSCHNEIDUNGS-HELFER ───
-// Dupliziert aus frontend/src/utils/javaUtils.js, weil Backend und
-// Frontend getrennte Node-Umgebungen sind. Muss inhaltlich exakt
-// gleich bleiben, damit die Verfügbarkeitsprüfung beim Annehmen einer
-// Anfrage konsistent zur Prüfung im Buchungs-Assistenten/
-// BuchungskarteModal bleibt.
+// ─── DATUMS- & ÜBERSCHNEIDUNGS-HELFER ───
 
-/** "DD.MM.YYYY" -> "YYYY-MM-DD" */
+/** Wandelt "DD.MM.YYYY" in "YYYY-MM-DD" um */
 function germanToISO(dateStr) {
   if (!dateStr) return "";
   const [d, m, y] = dateStr.split(".");
   return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
 }
 
-/**
- * Ob ein Objekt stundenweise (statt nächteweise) abgerechnet wird.
- * Alles außer einer Wohnung wird stundenweise abgerechnet - exakt
- * dieselbe Regel wie istStundenbasiert() im Frontend.
- */
+/** Prüft, ob ein Objekt stundenweise (nicht nächteweise) abgerechnet wird */
 function istStundenbasiert(objekt) {
   return !objekt?.name?.toLowerCase().includes("wohnung");
 }
 
-/** Nächteweise Überschneidung zweier Zeiträume (Enddatum exklusiv, wie beim Check-out). */
+/** Nächteweise Überschneidungsprüfung zweier Zeiträume */
 function ueberschneidenSich(startA, endA, startB, endB) {
   return startA < endB && endA > startB;
 }
 
-/** Stundengenaue Überschneidung zweier Zeiträume inkl. Uhrzeit (für Bus/Forum). */
+/** Stundengenaue Überschneidungsprüfung inkl. Uhrzeit */
 function datumZeitUeberschneidenSich(startA, zeitStartA, endA, zeitEndA, startB, zeitStartB, endB, zeitEndB) {
   const a1 = new Date(`${startA}T${zeitStartA}`);
   const a2 = new Date(`${endA}T${zeitEndA}`);
@@ -48,6 +38,7 @@ function datumZeitUeberschneidenSich(startA, zeitStartA, endA, zeitEndA, startB,
   return a1 < b2 && a2 > b1;
 }
 
+/** Berechnet die Differenz zweier Zeitpunkte in Stunden */
 function berechneStundenISO(startISO, startZeit, endISO, endZeit) {
   if (!startISO || !endISO || !startZeit || !endZeit) return 0;
   const [sh, sm] = startZeit.split(":").map(Number);
@@ -62,7 +53,7 @@ function berechneStundenISO(startISO, startZeit, endISO, endZeit) {
   return diffMs > 0 ? diffMs / (1000 * 60 * 60) : 0;
 }
 
-/** Berechnet den Vorschlagspreis im Backend exakt wie im Frontend. */
+/** Berechnet den vorgeschlagenen Gesamtpreis für eine Anfrage */
 async function berechneVorschlagsPreisBackend(anfrage) {
   if (!anfrage || !anfrage.anreise || !anfrage.abreise) return 0;
 
@@ -97,7 +88,7 @@ async function berechneVorschlagsPreisBackend(anfrage) {
   return Math.round((mainPreis + zusatzPreis) * 100) / 100;
 }
 
-/** Ermittelt die nächste fortlaufende Rechnungsnummer für das aktuelle Jahr. */
+/** Generiert die nächste fortlaufende Rechnungsnummer (z. B. RE-2026-0001) */
 async function generiereNaechsteRechnungsnummer() {
   const jahr = new Date().getFullYear();
 
@@ -118,7 +109,7 @@ async function generiereNaechsteRechnungsnummer() {
   return `RE-${jahr}-${String(naechsteZahl).padStart(4, "0")}`;
 }
 
-// GET /api/anfragen - alle Anfragen inkl. AnfrageGaeste, Objekt- und Zusatzobjektdaten.
+// GET /api/anfragen - Liefert alle Anfragen sortiert nach Erstelldatum
 router.get("/", async (req, res) => {
   try {
     const anfragen = await prisma.anfragen.findMany({
@@ -131,11 +122,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-// POST /api/anfragen - neue Anfrage von der öffentlichen Portal-Seite.
-// Speichert die Kontaktdaten in "AnfrageGaeste" (sofern die E-Mail dort noch
-// nicht existiert, sonst wird der vorhandene Anfragen-Gast aktualisiert).
-// Die Haupt-Gästetabelle (Gaeste) bleibt so frei von Spam und unbeantworteten/
-// abgelehnten Anfragen.
+// POST /api/anfragen - Neue Anfrage vom Portal erstellen
 router.post("/", async (req, res) => {
   try {
     const {
@@ -158,12 +145,15 @@ router.post("/", async (req, res) => {
       infos,
     } = req.body;
 
-    const emailClean = email ? email.trim().toLowerCase() : "";
+    // BUGFIX: Bei fehlender/leerer E-Mail null verwenden (verhindert Unique-Constraint-Verletzung bei Leerstrings)
+    const emailClean = email && email.trim() !== "" ? email.trim().toLowerCase() : null;
 
-    // 1. Kontakt in AnfrageGaeste suchen oder anlegen
-    let anfrageGast = await prisma.anfrageGaeste.findFirst({
-      where: { email: emailClean },
-    });
+    let anfrageGast = null;
+    if (emailClean) {
+      anfrageGast = await prisma.anfrageGaeste.findFirst({
+        where: { email: emailClean },
+      });
+    }
 
     if (anfrageGast) {
       anfrageGast = await prisma.anfrageGaeste.update({
@@ -193,7 +183,6 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // 2. Anfrage mit anfrage_gast_id verknüpfen
     const neueAnfrage = await prisma.anfragen.create({
       data: {
         anfrage_gast_id: anfrageGast.id,
@@ -218,11 +207,8 @@ router.post("/", async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 });
-// PUT /api/anfragen/:id/annehmen
-// 1. Verfügbarkeit im gewünschten Zeitraum ERNEUT prüfen.
-// 2. Anfragen-Gast (AnfrageGaeste) in die finale Gaeste-Tabelle übertragen/aktualisieren.
-// 3. Buchung + Rechnung automatisch anlegen (Gast-Nachricht erhält Prefix "Nachricht vom Gast: ").
-// 4. Anfrage-Status auf "angenommen" setzen.
+
+// PUT /api/anfragen/:id/annehmen - Anfrage annehmen, Gast & Buchung & Rechnung anlegen
 router.put("/:id/annehmen", async (req, res) => {
   try {
     const anfrageId = Number(req.params.id);
@@ -244,6 +230,7 @@ router.put("/:id/annehmen", async (req, res) => {
       where: { geloescht_am: null },
       include: { Objekte: true, ObjekteZusatz: true },
     });
+
     const belegungen = [];
     alleBuchungen.forEach((b) => {
       const start = germanToISO(b.anreise);
@@ -274,11 +261,14 @@ router.put("/:id/annehmen", async (req, res) => {
       return res.status(409).json({ error: `${anfrage.ObjekteZusatz.name} ist im gewünschten Zeitraum inzwischen belegt.` });
     }
 
-    // Erst bei ZUSAGE wird der Anfragen-Gast in die offizielle Haupt-Gästetabelle (Gaeste) übertragen.
+    // BUGFIX: Gast-Matching nur durchführen, wenn aGast.email tatsächlich vorhanden ist
     const aGast = anfrage.AnfrageGaeste;
-    let gast = await prisma.gaeste.findFirst({
-      where: { email: aGast.email, geloescht_am: null },
-    });
+    let gast = null;
+    if (aGast.email) {
+      gast = await prisma.gaeste.findFirst({
+        where: { email: aGast.email, geloescht_am: null },
+      });
+    }
 
     if (gast) {
       gast = await prisma.gaeste.update({
@@ -309,20 +299,16 @@ router.put("/:id/annehmen", async (req, res) => {
     }
 
     const vorschlagsPreis = await berechneVorschlagsPreisBackend(anfrage);
-
     const finalerPreis =
       preis !== undefined && preis !== null && !isNaN(Number(preis))
         ? Math.round(Number(preis) * 100) / 100
         : vorschlagsPreis;
 
     const rechnungsNummer = await generiereNaechsteRechnungsnummer();
-
-    // Nachricht vom Gast wird mit klarem Präfix für die Buchung formatiert
     const buchungInfos = anfrage.infos && anfrage.infos.trim()
       ? `Nachricht vom Gast: ${anfrage.infos.trim()}`
       : null;
 
-    // Buchung, Rechnung und Anfrage-Update laufen in einer Transaktion.
     const { neueBuchung, aktualisierteAnfrage, neueRechnung } = await prisma.$transaction(async (tx) => {
       const buchung = await tx.buchungen.create({
         data: {
@@ -370,7 +356,7 @@ router.put("/:id/annehmen", async (req, res) => {
   }
 });
 
-// PUT /api/anfragen/:id/ablehnen - Grund ist Pflicht, wird dauerhaft mitgespeichert.
+// PUT /api/anfragen/:id/ablehnen - Anfrage mit Begründung ablehnen
 router.put("/:id/ablehnen", async (req, res) => {
   try {
     const { grund } = req.body;

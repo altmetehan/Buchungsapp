@@ -16,16 +16,12 @@ import {
   berechneLiveVerfuegbarkeit,
 } from "../utils/javaUtils";
 import { useEinstellungen } from "./useEinstellungen";
+import { useToast } from "./useToast";
 
 const OBJEKTE_API = "/api/objekte";
 const OEFFENTLICHE_BUCHUNGEN_API = "/api/buchungen/oeffentlich";
 const ANFRAGEN_API = "/api/anfragen";
 
-// Standard-Zeitfenster für JEDE Verfügbarkeitsprüfung eines
-// stundenbasierten Objekts (Schritt 1-Liste UND Objektauswahl) - siehe
-// ausführlichen Kommentar dazu in useBuchungsAssistent.js. Bewusst NICHT
-// der "zeiten"-State, da der noch von einer vorherigen Objekt-/
-// Datumsauswahl eine andere Uhrzeit enthalten kann.
 const STANDARD_ANREISE_ZEIT = "09:00";
 const STANDARD_ABREISE_ZEIT = "17:00";
 
@@ -47,15 +43,10 @@ const berechneStunden = (startDatum, startZeit, endDatum, endZeit) => {
   return diffMs > 0 ? diffMs / (1000 * 60 * 60) : 0;
 };
 
-function toGermanDate(date) {
-  if (!date) return "";
-  const tag = String(date.getDate()).padStart(2, "0");
-  const monat = String(date.getMonth() + 1).padStart(2, "0");
-  return `${tag}.${monat}.${date.getFullYear()}`;
-}
-
 export function usePortalAnfrage() {
   const { einstellungen } = useEinstellungen();
+  const { toast, showToast, dismissToast } = useToast();
+
   const MINDEST_NAECHTE_WOHNUNG = einstellungen.mindest_naechte_wohnung;
   const ZUSATZOBJEKT_KOMBI_RABATT_PROZENT = einstellungen.kombirabatt ?? 0;
   const CHECKIN_WOCHENTAG = einstellungen.checkin_wochentag;
@@ -75,25 +66,15 @@ export function usePortalAnfrage() {
   const [isGuestPopupOpen, setIsGuestPopupOpen] = useState(false);
 
   const [selectedObjekt, setSelectedObjekt] = useState(null);
-
   const [zeiten, setZeiten] = useState({ anreiseZeit: STANDARD_ANREISE_ZEIT, abreiseZeit: STANDARD_ABREISE_ZEIT });
 
-  const [bookingDetails, setBookingDetails] = useState({
-    zusatzobjektMieten: "Nein",
-    kennzeichen: "",
-    info: "",
-  });
-
+  const [bookingDetails, setBookingDetails] = useState({ zusatzobjektMieten: "Nein" });
   const [gastData, setGastData] = useState(LEERES_GASTFORMULAR);
   const [nachricht, setNachricht] = useState("");
 
   const [isSaving, setIsSaving] = useState(false);
   const [wurdeGesendet, setWurdeGesendet] = useState(false);
-  const [toast, setToast] = useState(null);
   const [sendError, setSendError] = useState(false);
-
-  const showToast = (type, message) => setToast({ type, message });
-  const dismissToast = () => setToast(null);
 
   useEffect(() => {
     async function ladeStammdaten() {
@@ -124,7 +105,7 @@ export function usePortalAnfrage() {
               start: germanToISO(b.anreise),
               end: germanToISO(b.abreise),
               anreiseZeit: b.anreise_zeit,
-              abreiseZeit: b.abreise_zeit
+              abreiseZeit: b.abreise_zeit,
             });
           });
         });
@@ -144,15 +125,12 @@ export function usePortalAnfrage() {
     const clicked = info.date;
     if (isPastDate(clicked)) return;
 
-    // Wenn bereits ein Objekt gewählt ist (im "Zeitraum ändern"-Modal in Schritt 2):
     if (selectedObjekt) {
       if (istStundenbasiert(selectedObjekt.name)) {
-        // Stundenbasiert -> gleicher Tag als Start und Ende
         setDateRange({ start: clicked, end: clicked });
         setHoveredDate(null);
         return;
       } else {
-        // Wohnung:
         setDateRange((prev) => {
           if (!prev.start || (prev.start && prev.end)) {
             const nextDay = new Date(clicked);
@@ -170,7 +148,6 @@ export function usePortalAnfrage() {
       }
     }
 
-    // In Schritt 1 (vor Objektauswahl):
     setDateRange((prev) => {
       if (!prev.start || (prev.start && prev.end)) return { start: clicked, end: null };
       if (clicked < prev.start) return { start: clicked, end: prev.start };
@@ -191,7 +168,6 @@ export function usePortalAnfrage() {
     return Math.max(1, Math.round((dateRange.end - dateRange.start) / (1000 * 60 * 60 * 24)));
   }, [dateRange]);
 
-  // Berücksichtigt Uhrzeiten bei stundenbasierten Objekten (identisch zur Admin-Prüfung).
   const istVerfuegbar = useCallback(
     (objektName, sISO, eISO, startZeit = null, endZeit = null) => {
       if (!objektName || !sISO || !eISO) return true;
@@ -273,7 +249,6 @@ export function usePortalAnfrage() {
 
       const busStundensatz = zugewiesenesZusatzobjekt.preisProNacht || zugewiesenesZusatzobjekt.preis || 0;
       const zusatzPreisRegulaer = zusatzStunden * busStundensatz;
-
       const rabattFaktor = 1 - (ZUSATZOBJEKT_KOMBI_RABATT_PROZENT / 100);
       zusatzAufpreis = zusatzPreisRegulaer * rabattFaktor;
     }
@@ -293,7 +268,6 @@ export function usePortalAnfrage() {
     einstellungen.checkout_zeit,
   ]);
 
-  // ─── WOCHENTAGS-PRÜFUNG ───
   const checkinWochentagPasst = useMemo(() => {
     return entsprichtWochentag(dateRange.start, CHECKIN_WOCHENTAG);
   }, [dateRange.start, CHECKIN_WOCHENTAG]);
@@ -333,22 +307,16 @@ export function usePortalAnfrage() {
         info = `Mindestaufenthalt: ${MINDEST_NAECHTE_WOHNUNG} Nächte`;
         preis = null;
       } else if (!gueltigerZeitraum) {
-        // ZENTRALE LIVE-VERFÜGBARKEIT: berücksichtigt lückenlose Anschlussbuchungen und Tagesanreisen
         const live = berechneLiveVerfuegbarkeit(obj.name, belegungen, einstellungen);
         status = live.status;
         info = live.info;
         preis = null;
       } else {
         if (stundenbasiert) {
-          // b.name OR b.resource prüfen, damit Haupt- und Zusatzobjekte sicher gefunden werden
           const tagesBelegungen = belegungen.filter(
             (b) => (b.name || b.resource)?.toLowerCase() === obj.name?.toLowerCase() && b.start <= endISO && b.end >= startISO
           );
 
-          // WICHTIG: fest mit der Standardzeit prüfen, nicht mit dem
-          // "zeiten"-State (siehe Kommentar am Kopf dieser Datei) -
-          // sonst kann eine von einer früheren Auswahl übrig gebliebene
-          // Uhrzeit einen tatsächlichen Konflikt verschleiern.
           const verfuegbarFuerUhrzeit = istVerfuegbar(
             obj.name,
             startISO,
@@ -356,7 +324,6 @@ export function usePortalAnfrage() {
             STANDARD_ANREISE_ZEIT,
             STANDARD_ABREISE_ZEIT
           );
-          // Objekt ist ganztägig belegt, wenn eine mehrtägige Buchung (z.B. Wohnungs-Zusatzbus) über diesen Tag geht
           const durchgehendBelegt = tagesBelegungen.some(
             (b) => (b.anreiseZeit === "00:00" && b.abreiseZeit === "23:59") || !b.anreiseZeit || (b.start < startISO && b.end > endISO)
           );
@@ -413,14 +380,11 @@ export function usePortalAnfrage() {
     let start = dateRange.start;
     let end = dateRange.end;
 
-    // Automatische Datumslogik je nach Typ
     if (start) {
       if (istStundenbasiert(obj.name)) {
-        // Stundenbasiert -> Rückgabedatum ist automatisch Anreisedatum (gleicher Tag)
         end = start;
         setDateRange({ start, end: start });
       } else {
-        // Wohnung -> Abreisedatum ist mindestens Folgetag
         if (!end || isSameDay(start, end)) {
           const folgetag = new Date(start);
           folgetag.setDate(folgetag.getDate() + 1);
@@ -434,11 +398,6 @@ export function usePortalAnfrage() {
     const eISO = toISO(end);
 
     if (istStundenbasiert(obj.name) && start && end) {
-      // Siehe ausführlichen Kommentar in useBuchungsAssistent.js: immer
-      // von der festen Standardzeit ausgehen statt vom evtl. noch
-      // veralteten "zeiten"-State, und am Ende IMMER explizit setZeiten
-      // aufrufen (auch als expliziter Reset auf die Standardzeit, falls
-      // keine Alternativzeit gefunden wurde).
       const istStandardFrei = istVerfuegbar(
         obj.name,
         sISO,
@@ -483,7 +442,6 @@ export function usePortalAnfrage() {
     setWizardStep(2);
   };
 
-  // ─── GEBUCHTE UHRZEITEN AM GEWÄHLTEN TAG ERFASSEN ───
   const tagesBuchungen = useMemo(() => {
     if (!selectedObjekt || !dateRange.start || !dateRange.end) return [];
     return belegungen
@@ -512,14 +470,12 @@ export function usePortalAnfrage() {
     return istVerfuegbar(selectedObjekt.name, startISO, endISO);
   }, [selectedObjekt, dateRange.start, dateRange.end, startISO, endISO, zeiten, istVerfuegbar]);
 
-  // ─── KOLLISIONSTEXT  ───
   const kollisionsText = useMemo(() => {
     if (tagesBuchungen.length === 0 || selectedObjektVerfuegbar) return null;
 
     const objName = selectedObjekt?.name;
 
     if (istHauptobjektStundenbasiert) {
-      // Bei mehr als 3 Kollisionen kompakte Übersicht anzeigen
       if (tagesBuchungen.length > 3) {
         return `⚠ ${objName} ist im gewählten Zeitraum mehrfach belegt (siehe Kalender für Details zur Verfügbarkeit).`;
       }
@@ -593,8 +549,8 @@ export function usePortalAnfrage() {
         land: gastData.land,
         objekt_id: selectedObjekt.id,
         objekt_id_2: zusatzobjektGebucht ? zugewiesenesZusatzobjekt.id : null,
-        anreise: toGermanDate(dateRange.start),
-        abreise: toGermanDate(dateRange.end),
+        anreise: formatDe(dateRange.start),
+        abreise: formatDe(dateRange.end),
         anreise_zeit: istHauptobjektStundenbasiert ? zeiten.anreiseZeit : einstellungen.checkin_zeit,
         abreise_zeit: istHauptobjektStundenbasiert ? zeiten.abreiseZeit : einstellungen.checkout_zeit,
         erwachsene: istWohnung(selectedObjekt?.name) ? guestCounts.erwachsene : null,
@@ -625,28 +581,61 @@ export function usePortalAnfrage() {
     setGastData(LEERES_GASTFORMULAR);
     setGuestCounts({ erwachsene: 2, kinder: 0 });
     setZeiten({ anreiseZeit: STANDARD_ANREISE_ZEIT, abreiseZeit: STANDARD_ABREISE_ZEIT });
-    setBookingDetails({ zusatzobjektMieten: "Nein", kennzeichen: "", info: "" });
+    setBookingDetails({ zusatzobjektMieten: "Nein" });
     setNachricht("");
     setWurdeGesendet(false);
     setSendError(false);
   };
 
   return {
-    wizardStep, setWizardStep,
-    apiLoading, apiError,
-    dateRange, hoveredDate, setHoveredDate, handleDateClick, handleClearSelection,
-    guestCounts, setGuestCounts, isGuestPopupOpen, setIsGuestPopupOpen,
-    startISO, endISO, naechteAnz,
-    verfuegbareObjekte, handleSelectObjekt,
-    selectedObjekt, setSelectedObjekt, selectedObjektVerfuegbar, istVerfuegbar,
-    objektStammdaten, gesamtpreisBerechnet, istHauptobjektWohnung, istHauptobjektStundenbasiert,
-    zeiten, setZeiten, stundenHauptobjekt,
-    bookingDetails, setBookingDetails, zusatzobjektVerfuegbar, zugewiesenesZusatzobjekt,
-    gastData, setGastData, handleGastChange,
-    nachricht, setNachricht,
-    isSaving, wurdeGesendet, sendError, setSendError, handleSubmitAnfrage, handleNeueAnfrage, istAnfrageUngueltig,
+    wizardStep,
+    setWizardStep,
+    apiLoading,
+    apiError,
+    dateRange,
+    hoveredDate,
+    setHoveredDate,
+    handleDateClick,
+    handleClearSelection,
+    guestCounts,
+    setGuestCounts,
+    isGuestPopupOpen,
+    setIsGuestPopupOpen,
+    startISO,
+    endISO,
+    naechteAnz,
+    verfuegbareObjekte,
+    handleSelectObjekt,
+    selectedObjekt,
+    setSelectedObjekt,
+    selectedObjektVerfuegbar,
+    istVerfuegbar,
+    objektStammdaten,
+    gesamtpreisBerechnet,
+    istHauptobjektWohnung,
+    istHauptobjektStundenbasiert,
+    zeiten,
+    setZeiten,
+    stundenHauptobjekt,
+    bookingDetails,
+    setBookingDetails,
+    zusatzobjektVerfuegbar,
+    zugewiesenesZusatzobjekt,
+    gastData,
+    setGastData,
+    handleGastChange,
+    nachricht,
+    setNachricht,
+    isSaving,
+    wurdeGesendet,
+    sendError,
+    setSendError,
+    handleSubmitAnfrage,
+    handleNeueAnfrage,
+    istAnfrageUngueltig,
     kollisionsText,
-    toast, dismissToast,
+    toast,
+    dismissToast,
     MINDEST_NAECHTE_WOHNUNG,
     unterschreitetMindestNaechte,
     CHECKIN_WOCHENTAG,
@@ -655,6 +644,6 @@ export function usePortalAnfrage() {
     checkoutWochentagPasst,
     startWochentag: getWochentagName(dateRange.start),
     endWochentag: getWochentagName(dateRange.end),
-    ZUSATZOBJEKT_KOMBI_RABATT_PROZENT
+    ZUSATZOBJEKT_KOMBI_RABATT_PROZENT,
   };
 }

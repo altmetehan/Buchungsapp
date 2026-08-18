@@ -2,17 +2,18 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { DashboardKategorieSektion } from "../components/dashboard/DashboardKategorieSektion";
 import { MiniKalenderModal } from "../components/dashboard/MiniKalenderModal";
+
 import {
   formatDe,
   parseISO,
   germanToISO,
-  toISO,
   getResourceClass,
   parseGermanDate,
   getNowIsoWithTime,
   istWohnung,
   istBus,
 } from "../utils/javaUtils";
+
 import { BuchungskarteModal } from "../components/BuchungskarteModal";
 import { useEinstellungen } from "../hooks/useEinstellungen";
 import { Toast } from "../components/ui/Toast";
@@ -44,9 +45,6 @@ export function Dashboard() {
   const navigate = useNavigate();
   const { toast, showToast, dismissToast } = useToast();
 
-  const today = new Date();
-  const todayStr = toISO(today);
-
   const [reservations, setReservations] = useState([]);
   const [allObjects, setAllObjects] = useState([]);
   const [offeneAnfragenCount, setOffeneAnfragenCount] = useState(0);
@@ -57,7 +55,7 @@ export function Dashboard() {
   const [selectedObjForCalendar, setSelectedObjForCalendar] = useState(null);
   const [selectedResForDetails, setSelectedResForDetails] = useState(null);
 
-  /** Formatiert die Gästeanzahl kompakt, z.B. "2 Erw. · 1 Kind." - gibt null zurück, wenn keine Daten vorhanden sind (ältere Buchungen). */
+  /** Formatiert Gästeanzahl kompakt */
   const formatGaesteInfo = (erwachsene, kinder) => {
     if (erwachsene === null || erwachsene === undefined) return null;
     const kinderTeil = kinder ? ` · ${kinder} Kind${kinder > 1 ? "er" : ""}` : "";
@@ -93,7 +91,6 @@ export function Dashboard() {
         const obj = {
           id: b.id,
           guestName: gast?.name,
-          name: gast?.name,
           email: gast?.email,
           phone: gast?.telnr,
           strasse: gast?.strasse,
@@ -115,7 +112,7 @@ export function Dashboard() {
           rawBooking: b,
           preisanpassungen: b.Preisanpassungen || [],
           erwachsene: b.erwachsene ?? null,
-          kinder: b.kinder ?? null,        
+          kinder: b.kinder ?? null,
         };
 
         obj.start = germanToISO(obj.checkIn);
@@ -135,8 +132,6 @@ export function Dashboard() {
           obj.status = "vergangen";
         }
 
-        // Primär den in der DB gespeicherten Preis (b.preis) verwenden,
-        // nur falls keiner gespeichert ist selbst nachrechnen.
         if (b.preis !== null && b.preis !== undefined) {
           obj.preis = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(b.preis);
         } else if (obj.checkIn && obj.checkOut && objekt?.preis) {
@@ -165,23 +160,14 @@ export function Dashboard() {
   }, [einstellungen]);
 
   useEffect(() => {
-    ladeDashboardDaten(true); // Erstes Laden mit Anzeige
+    ladeDashboardDaten(true);
   }, [ladeDashboardDaten]);
 
-  // ladeDashboardDaten() lädt Objekte, Buchungen und Anfragen in einem
-  // Rutsch - deshalb hier drei einzelne Abos statt nur eines, jedes mit
-  // demselben Callback: egal welche der drei Ressourcen sich ändert
-  // (neue Buchung über den Assistenten, ein Objekt wird umbenannt, eine
-  // Anfrage kommt rein), lädt das Dashboard neu. Jede Backend-Route
-  // bleibt so dafür zuständig, nur ihr eigenes Event zu melden, statt
-  // dass z.B. die Objekte-Seite wissen müsste, dass sie fürs Dashboard
-  // mitbroadcasten muss.
+  // Live-Updates über WebSocket
   useWebSocket("buchungen:changed", () => ladeDashboardDaten(false));
   useWebSocket("objekte:changed", () => ladeDashboardDaten(false));
   useWebSocket("anfragen:changed", () => ladeDashboardDaten(false));
 
-  // Objekte werden in genau zwei Kategorien aufgeteilt: Wohnungen und
-  // "Andere Objekte" (alles, was keine Wohnung ist - Bus, Forum, ...).
   const wohnungen = useMemo(
     () => allObjects.filter((obj) => istWohnung(obj.name)),
     [allObjects],
@@ -191,27 +177,7 @@ export function Dashboard() {
     [allObjects],
   );
 
-  /** Baut aus einem ISO-Datum ("YYYY-MM-DD") + einer Uhrzeit ("HH:MM") ein echtes Date-Objekt. */
-  const getZeitDatum = (isoDatum, zeitStr) => {
-    if (!isoDatum) return null;
-    const [y, m, d] = isoDatum.split("-").map(Number);
-    const [h, min] = (zeitStr || "00:00").split(":").map(Number);
-    return new Date(y, m - 1, d, h, min, 0, 0);
-  };
-
-  // Wohnungen ohne eigene Zeitangabe nutzen die üblichen Check-in/-out-Zeiten (15:00 / 11:00).
-  const getAnreiseDatumZeit = (b) => getZeitDatum(b.start, b.anreiseZeit || einstellungen.checkin_zeit);
-  const getAbreiseDatumZeit = (b) => getZeitDatum(b.end, b.abreiseZeit || einstellungen.checkout_zeit);
-
-  /**
-   * Ermittelt den Live-Status eines Objekts (frei/belegt) für "heute",
-   * inklusive der nächsten bekannten Änderung. Berücksichtigt auch
-   * Buchungen, bei denen das Objekt nur als Zusatzobjekt (z.B. Bus zu
-   * einer Wohnung) mitgebucht wurde.
-   *
-   * @param {string} resourceName
-   * @returns {{status: string, guest: string, subDate: string}}
-   */
+  /** Ermittelt den Belegungsstatus für heute und nächste Änderungen */
   const getLiveStatus = (resourceName) => {
     const nameLower = resourceName.toLowerCase();
     const nowStr = getNowIsoWithTime();
@@ -223,21 +189,16 @@ export function Dashboard() {
 
       if (!matchesResource) return false;
 
-      // Start- und Endzeitpunkt inkl. Uhrzeit aufbauen
       const startZeit = b.anreiseZeit || "00:00";
       const endZeit = b.abreiseZeit || "23:59";
 
       const startFull = `${b.start}T${startZeit}`;
       const endFull = `${b.end}T${endZeit}`;
 
-      // Aktuell belegt nur, wenn die Anreisezeit jetzt schon erreicht ist.
       return nowStr >= startFull && nowStr <= endFull;
     });
 
     if (activeBooking) {
-      // Wenn diese Buchung ein Zusatzobjekt hat (z.B. Wohnung + Bus),
-      // und resourceName selbst nicht schon das Zusatzobjekt ist (dann
-      // wäre die Info redundant), zeigen wir das im Status mit an.
       const zusatzInfo =
         activeBooking.zusatzobjektName && activeBooking.zusatzobjektName.toLowerCase() !== nameLower
           ? activeBooking.zusatzobjektName
@@ -253,7 +214,6 @@ export function Dashboard() {
       };
     }
 
-    // Nächste zukünftige Buchung ermitteln
     const futureBookings = reservations
       .filter((b) => {
         const matchesResource =
@@ -285,17 +245,16 @@ export function Dashboard() {
     return { status: "frei", guest: "-", zusatz: null, subDate: "durchgehend frei" };
   };
 
-  // Wohnungen - Ankünfte (nur Buchungen, deren Anreisezeit noch in der Zukunft liegt)
+  // Nächste Ankünfte für Wohnungen
   const apartmentArrivals = useMemo(() => {
     const nowStr = getNowIsoWithTime();
 
     return reservations
       .filter((b) => {
         if (!istWohnung(b.resource)) return false;
-
         const startZeit = b.anreiseZeit || "00:00";
         const startFull = `${b.start}T${startZeit}`;
-        return startFull > nowStr; // Zeige nur Ankünfte, die noch nicht angekommen sind
+        return startFull > nowStr;
       })
       .sort((a, b) => {
         const aFull = `${a.start}T${a.anreiseZeit || "00:00"}`;
@@ -314,7 +273,7 @@ export function Dashboard() {
       }));
   }, [reservations]);
 
-  // Andere Objekte - Ankünfte (Fahrzeuge / Räume mit Uhrzeit)
+  // Nächste Ankünfte für andere Objekte
   const andereObjekteArrivals = useMemo(() => {
     const nowStr = getNowIsoWithTime();
 
@@ -350,7 +309,6 @@ export function Dashboard() {
       });
   }, [reservations]);
 
-
   const stats = useMemo(() => {
     const totalApts = wohnungen.length;
     const totalAndere = andereObjekte.length;
@@ -367,7 +325,6 @@ export function Dashboard() {
     };
   }, [reservations, wohnungen, andereObjekte]);
 
-  /** Baut die FullCalendar-Events für das Mini-Kalender-Popup eines einzelnen Objekts. */
   const getFilteredEventsForCalendar = () => {
     if (!selectedObjForCalendar) return [];
 
@@ -397,15 +354,6 @@ export function Dashboard() {
     });
   };
 
-  /**
-   * Öffnet die PDF-Rechnung der aktuell aktiven Buchung eines Objekts.
-   * Der PDF-Button in der Status-Liste ist nur klickbar, wenn das
-   * Objekt gerade "belegt" ist (siehe disabled-Logik in
-   * DashboardKategorieSektion/ActionButton) - hier wird dieselbe
-   * "welche Buchung ist jetzt aktiv"-Prüfung wie in getLiveStatus()
-   * nochmal gemacht, weil getLiveStatus() selbst nur den Anzeige-Status
-   * zurückgibt, keine Buchungs-ID.
-   */
   const handlePdfClick = (obj) => {
     const nameLower = obj.name.toLowerCase();
     const nowStr = getNowIsoWithTime();
@@ -432,7 +380,6 @@ export function Dashboard() {
     }
   };
 
-  /** Öffnet dieselbe Buchungskarte wie überall sonst über die Buchungs-ID (die Ankünfte-Liste selbst trägt nur reduzierte Anzeige-Felder). */
   const handleArrivalDetailsClick = (bookingId) => {
     const booking = reservations.find((b) => b.id === bookingId);
     if (booking) setSelectedResForDetails(booking);
@@ -444,7 +391,7 @@ export function Dashboard() {
   return (
     <div className="dashboard-container">
       <Toast toast={toast} onClose={dismissToast} />
-      
+
       <div className="page-header">
         <div className="header-text">
           <h2>Dashboard</h2>
@@ -529,9 +476,9 @@ export function Dashboard() {
       <BuchungskarteModal
         reservation={selectedResForDetails}
         onClose={() => setSelectedResForDetails(null)}
-        onDeleted={(id, msg) => {
+        onDeleted={() => {
           ladeDashboardDaten(false);
-          if (msg) showToast("success", msg);
+          showToast("success", "Buchung wurde storniert.");
         }}
         onUpdated={(updated, msg) => {
           ladeDashboardDaten(false);

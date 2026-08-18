@@ -25,8 +25,8 @@ export function useEinstellungen() {
   const [einstellungen, setEinstellungen] = useState({
     checkin_zeit: "15:00",
     checkout_zeit: "11:00",
-    mindest_naechte_wohnung: 7,
-    kombirabatt: 75,
+    mindest_naechte_wohnung: 2,
+    kombirabatt: 0,
     checkin_wochentag: "",
     checkout_wochentag: "",
   });

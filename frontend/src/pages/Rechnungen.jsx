@@ -1,4 +1,3 @@
-// pages/Rechnungen.jsx
 import { useState, useEffect, useMemo, useRef } from "react";
 import "../styles/shared-ui.css";
 import "../styles/pageStyles/Rechnungen.css";
@@ -9,11 +8,11 @@ import { parseGermanDate } from "../utils/javaUtils";
 const RECHNUNGEN_API = "/api/rechnungen";
 const BUCHUNGEN_API = "/api/buchungen";
 
-/** Formatiert eine Zahl als "€ 1.234,50" - lokal hier, weil an mehreren Stellen dieser Datei gebraucht. */
+/** Formatiert eine Zahl als Euro-Währung */
 const formatEuro = (zahl) =>
-  new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(zahl);
+  new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(zahl || 0);
 
-/** Formatiert einen ISO-Zeitstempel ("erstellt_am") als "DD.MM.YYYY, HH:MM Uhr". */
+/** Formatiert einen ISO-Zeitstempel */
 const formatZeitstempel = (isoStr) => {
   if (!isoStr) return "";
   const d = new Date(isoStr);
@@ -57,11 +56,6 @@ export function Rechnungen() {
     ladeDaten();
   }, []);
 
-  // ─── ROHDATEN -> ANZEIGE-FREUNDLICHE FORM ───
-  // WICHTIG: "buchungPreisRoh" (echte Zahl, kein formatierter String) und
-  // "preisanpassungen" (die Historie) werden hier zusätzlich mitgegeben -
-  // die braucht das Bearbeiten-Modal, um mit dem Rabatt-/Endbetrag-Feld
-  // rechnen zu können bzw. die Historie anzuzeigen.
   const invoices = useMemo(() => {
     return rechnungenRaw.map((r) => {
       const buchung = r.Buchungen;
@@ -76,8 +70,8 @@ export function Rechnungen() {
           : naechte * (buchung?.Objekte?.preis || 0);
 
       const objektAnzeige = buchung?.Objekte?.name
-        ? `${buchung.Objekte.name}${buchung?.ObjekteZusatz ? " + " + buchung.ObjekteZusatz.name: ""}`
-        : "Unbekanntes Objekt";   
+        ? `${buchung.Objekte.name}${buchung?.ObjekteZusatz ? " + " + buchung.ObjekteZusatz.name : ""}`
+        : "Unbekanntes Objekt";
 
       return {
         id: r.id,
@@ -97,17 +91,17 @@ export function Rechnungen() {
     () => new Set(rechnungenRaw.map((r) => r.buchung_id)),
     [rechnungenRaw],
   );
+
   const verfuegbareBuchungen = useMemo(
     () => bookings.filter((b) => !buchungIdsMitRechnung.has(b.id)),
     [bookings, buchungIdsMitRechnung],
   );
 
   const [searchQuery, setSearchQuery] = useState("");
+  const aktuellesDatum = new Date();
 
-  const aktuellerDatum = new Date();
-
-  const [selectedMonth, setSelectedMonth] = useState(aktuellerDatum.getMonth());
-  const [selectedYear, setSelectedYear] = useState(aktuellerDatum.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(aktuellesDatum.getMonth());
+  const [selectedYear, setSelectedYear] = useState(aktuellesDatum.getFullYear());
 
   const [isMonthDropdownOpen, setIsMonthDropdownOpen] = useState(false);
   const [isYearDropdownOpen, setIsYearDropdownOpen] = useState(false);
@@ -163,10 +157,8 @@ export function Rechnungen() {
   ];
 
   const jahre = [2025, 2026, 2027, 2028, 2029, 2030];
-
   const monatName = monate.find((m) => m.value === selectedMonth)?.label || "";
 
-  // ─── MODAL-STATE ───
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null);
   const [invoiceForm, setInvoiceForm] = useState({
@@ -174,13 +166,6 @@ export function Rechnungen() {
     rechnungsDatum: "",
   });
 
-  // ─── PREIS-ANPASSUNGS-FORMULAR (nur im Bearbeiten-Modus relevant) ───
-  // "basisPreis" ist der Preis, wie er VOR dieser Bearbeitung auf der
-  // Buchung stand - Rabatt-% und Endbetrag werden immer relativ dazu
-  // synchron gehalten (exakt dasselbe Muster wie in BuchungskarteModal).
-  // NEU gegenüber der Buchungskarte: rabattProzent darf hier auch
-  // NEGATIV sein - negativ bedeutet "Erhöhung" statt "Reduzierung",
-  // weil der Chef beides über dasselbe Feld abbilden wollte.
   const [preisForm, setPreisForm] = useState({
     basisPreis: 0,
     rabattProzent: "0",
@@ -209,7 +194,6 @@ export function Rechnungen() {
     setIsModalOpen(true);
   };
 
-  /** Rabatt-% geändert -> Endbetrag relativ zum Basispreis neu berechnen. Negativer Wert = Erhöhung. */
   const handleRabattChange = (e) => {
     const rawVal = e.target.value;
     if (rawVal === "") {
@@ -220,9 +204,6 @@ export function Rechnungen() {
     let num = parseFloat(rawVal.replace(",", "."));
     if (isNaN(num)) return;
 
-    // Nach oben (Reduzierung) auf 100% begrenzt (mehr als "geschenkt" geht
-    // nicht) - nach unten (Erhöhung) bewusst OFFEN gelassen, weil eine
-    // Preiserhöhung theoretisch beliebig hoch ausfallen kann.
     num = Math.min(100, num);
     const neuerBetrag = Math.max(0, preisForm.basisPreis * (1 - num / 100));
 
@@ -233,7 +214,6 @@ export function Rechnungen() {
     }));
   };
 
-  /** Endbetrag geändert -> passenden Rabatt-% zurückrechnen (negativ, falls Erhöhung). */
   const handleEndbetragChange = (e) => {
     const rawVal = e.target.value;
     const neuerBetrag = parseFloat(rawVal.replace(",", "."));
@@ -247,9 +227,6 @@ export function Rechnungen() {
     setPreisForm((prev) => ({ ...prev, endbetrag: rawVal, rabattProzent: berechneterRabatt }));
   };
 
-  // Ob sich der Preis gegenüber dem Ausgangswert überhaupt geändert hat -
-  // steuert, ob beim Speichern eine Preisanpassung angelegt wird UND ob
-  // die Begründung als Pflichtfeld gilt (ohne Änderung braucht's keine).
   const preisWurdeGeaendert =
     editingInvoice != null &&
     !isNaN(parseFloat(preisForm.endbetrag)) &&
@@ -268,11 +245,6 @@ export function Rechnungen() {
     setIsSaving(true);
     try {
       if (editingInvoice) {
-        // 1. Falls der Preis geändert wurde: ZUERST die Preisanpassung
-        //    anlegen (schreibt auch direkt den neuen Preis auf die
-        //    Buchung) - erst danach das Rechnungsdatum aktualisieren,
-        //    damit im Fehlerfall (z.B. Preisanpassung schlägt fehl) gar
-        //    nicht erst ein halb gespeicherter Zustand entsteht.
         if (preisWurdeGeaendert) {
           const anpassungRes = await fetch(
             `${BUCHUNGEN_API}/${editingInvoice.buchungId}/preisanpassungen`,
@@ -302,9 +274,6 @@ export function Rechnungen() {
           rechnungenRaw.map((r) => (r.id === editingInvoice.id ? aktualisiert : r)),
         );
 
-        // Buchungsliste ebenfalls aktualisieren, damit z.B. das
-        // Buchungs-Dropdown beim nächsten "Rechnung erstellen" sofort
-        // den neuen Preis zeigt, ohne die Seite neu laden zu müssen.
         if (preisWurdeGeaendert) {
           setBookings((prev) =>
             prev.map((b) =>
@@ -328,7 +297,6 @@ export function Rechnungen() {
         setRechnungenRaw([neueRechnung, ...rechnungenRaw]);
         showToast("success", `Neue Rechnung für Buchung #${invoiceForm.buchungId} wurde erstellt.`);
       }
-
 
       setIsModalOpen(false);
       setEditingInvoice(null);
@@ -364,31 +332,20 @@ export function Rechnungen() {
   );
   const summeMonatFormatiert = formatEuro(summeMonatRaw);
 
-  const filteredRechnungen = invoices
-    .filter((res) => {
-      if (searchQuery.trim() === "") {
-        return istImAusgewaehltenMonat(res.datum);
-      }
+  const filteredRechnungen = invoices.filter((res) => {
+    if (searchQuery.trim() === "") {
+      return istImAusgewaehltenMonat(res.datum);
+    }
 
-      const searchWords = searchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    const searchWords = searchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    const rnrDarfMitsuchen = searchWords.length === 1;
 
-      // NEU: Die Rechnungsnummer wird NUR bei einer EINZELNEN
-      // Sucheingabe mit durchsucht (z.B. direkte Suche nach
-      // "RE-2026-0003"). Bei mehreren Wörtern (z.B. "Anna Krainer
-      // Wohnung 3") bleibt sie außen vor - sonst matcht eine einzelne
-      // Ziffer wie die "3" zufällig irgendwo innerhalb einer GANZ
-      // ANDEREN Rechnungsnummer (die Nummerierung läuft chronologisch,
-      // nicht nach Wohnungsnummer), während "wohnung" zufällig im
-      // Objektnamen einer anderen Zeile trifft - beide Treffer kämen
-      // dann aus unzusammenhängenden Feldern.
-      const rnrDarfMitsuchen = searchWords.length === 1;
+    const textFelder = [res.gast, res.objekt];
+    if (rnrDarfMitsuchen) textFelder.push(res.rnr);
 
-      const textFelder = [res.gast, res.objekt];
-      if (rnrDarfMitsuchen) textFelder.push(res.rnr);
-
-      const durchsuchbarerText = textFelder.filter(Boolean).join(" ").toLowerCase();
-      return searchWords.every((word) => durchsuchbarerText.includes(word));
-    })
+    const durchsuchbarerText = textFelder.filter(Boolean).join(" ").toLowerCase();
+    return searchWords.every((word) => durchsuchbarerText.includes(word));
+  });
 
   const gewaehlteBuchung = useMemo(
     () => bookings.find((b) => b.id === Number(invoiceForm.buchungId)),
@@ -401,7 +358,6 @@ export function Rechnungen() {
   return (
     <div className="rechnungen-container">
       <Toast toast={toast} onClose={dismissToast} />
-      {/* PAGE HEADER */}
       <div className="page-header">
         <div className="header-text">
           <h2>Rechnungen</h2>
@@ -416,7 +372,6 @@ export function Rechnungen() {
         </button>
       </div>
 
-      {/* STATS BAR */}
       <div className="stats-container">
         <div className="stats-item">
           <span className="stats-label">
@@ -432,7 +387,6 @@ export function Rechnungen() {
         </div>
       </div>
 
-      {/* Suche & Custom Filterbar */}
       <div
         className="filter-bar"
         style={{ display: "flex", gap: "8px", alignItems: "center" }}
@@ -529,7 +483,6 @@ export function Rechnungen() {
           : "Suchergebnisse im gesamten Archiv"}
       </p>
 
-      {/* RECHNUNGEN-BOX */}
       <div className="card-box">
         <div className="list-row list-header-row list-header-row--sticky grid-rechnungen">
           <span>R.Nr.</span>
@@ -549,7 +502,6 @@ export function Rechnungen() {
                 <span className="res-gast">{rechnung.gast}</span>
                 <span className="res-betrag">
                   {rechnung.betrag}
-                  {/* Kleiner Hinweis, falls dieser Preis schon mal nachträglich angepasst wurde */}
                   {rechnung.preisanpassungen.length > 0 && (
                     <span
                       title={`${rechnung.preisanpassungen.length}x angepasst - Details über "Bearbeiten"`}
@@ -584,7 +536,6 @@ export function Rechnungen() {
         </div>
       </div>
 
-      {/* MODAL (Erstellen + Bearbeiten) */}
       {isModalOpen && (
         <div className="modal-backdrop">
           <div className="modal-content form-card">
@@ -676,11 +627,6 @@ export function Rechnungen() {
                   />
                 </div>
 
-                {/* ─── PREIS BEARBEITEN (nur im Bearbeiten-Modus) ───
-                    Rabatt (%) und Endbetrag (€) sind synchronisiert -
-                    exakt dasselbe Muster wie in BuchungskarteModal, nur
-                    dass der Rabatt-Wert hier auch negativ sein darf
-                    (= Preiserhöhung statt Reduzierung). */}
                 {editingInvoice && (
                   <>
                     <div className="input-group">
@@ -735,7 +681,6 @@ export function Rechnungen() {
                       </span>
                     </div>
 
-                    {/* ─── HISTORIE BISHERIGER ANPASSUNGEN ─── */}
                     {editingInvoice.preisanpassungen.length > 0 && (
                       <div className="input-group full-width">
                         <label>Bisherige Preisänderungen</label>
