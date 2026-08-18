@@ -71,7 +71,7 @@ Details zu den einzelnen Unterordnern (Routen, Komponenten, Hooks, Styles) siehe
 
 ### Lokal (ohne Docker)
 
-Voraussetzung: Node.js 20+
+Voraussetzung: Node.js 24+
 
 **Backend**
 
