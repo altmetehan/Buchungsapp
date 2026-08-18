@@ -31,19 +31,23 @@
     font-size: 14px;
 }
 
-/* --- SIDEBAR --- */
+
+/* --- SIDEBAR GRUNDGERÜST (DESKTOP) --- */
 .sidebar {
     width: 260px;
+    min-width: 260px;
     background-color: #f8f9fa;
     border-right: 1px solid #e4e4e7;
     display: flex;
     flex-direction: column;
     padding: 40px 24px;
-    transition: width 0.3s ease, padding 0.3s ease;
+    transition: width 0.3s ease, min-width 0.3s ease, padding 0.3s ease;
     overflow: hidden;
-    min-width: 260px;
+    white-space: nowrap;
+    z-index: 1000;
 }
 
+/* Eingeklappter Zustand: 70px-Leiste mit sichtbarem Drei-Striche-Button */
 .sidebar.collapsed {
     width: 70px;
     min-width: 70px;
@@ -63,6 +67,13 @@
 .sidebar.collapsed .sidebar-header {
     justify-content: center;
     margin-bottom: 0;
+}
+
+/* Inhalte bei 70px ausblenden, damit nur der Burger-Button bleibt */
+.sidebar.collapsed .nav-links,
+.sidebar.collapsed .sidebar-footer,
+.sidebar.collapsed .logo {
+    display: none;
 }
 
 .toggle-button {
@@ -178,7 +189,10 @@
     gap: 8px;
 }
 
-/* --- RESPONSIVE OVERLAYS --- */
+
+/* ==========================================================================
+   RESPONSIVE: IPAD & TABLET (<= 1200px)
+   ========================================================================== */
 .mobile-sidebar-backdrop {
     display: none;
 }
@@ -190,40 +204,60 @@
         inset: 0;
         background-color: rgba(0, 0, 0, 0.45);
         z-index: 1500;
+        backdrop-filter: blur(2px);
     }
 
+    /* Die Sidebar ist auf Tablets IMMER fixed (gleitet nur auf/zu) */
     .sidebar {
-        transition: none !important;
-    }
-
-    .sidebar:not(.collapsed) {
-        position: fixed;
+        position: fixed !important;
         top: 0;
         left: 0;
         height: 100vh;
-        width: 280px;
-        min-width: 280px;
         z-index: 2000;
-        box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
+        transition: width 0.28s ease, min-width 0.28s ease, box-shadow 0.28s ease !important;
     }
 
+    /* Eingeklappt: Schmaler 70px Fix-Streifen am linken Rand */
     .sidebar.collapsed {
-        transition: none !important;
+        width: 70px !important;
+        min-width: 70px !important;
+        padding: 40px 0;
+        box-shadow: none !important;
     }
 
+    /* Ausgeklappt: Gleitet als 280px Overlay über den Inhalt */
+    .sidebar:not(.collapsed) {
+        width: 280px !important;
+        min-width: 280px !important;
+        padding: 40px 24px;
+        box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18) !important;
+    }
+
+    /* Der Seiteninhalt bleibt 100% starr und bewegt sich um keinen Millimeter */
     .main-content {
-        padding: 28px 20px;
+        margin-left: 70px !important;
+        width: calc(100vw - 70px) !important;
+        padding: 32px 28px;
         overflow-x: hidden;
+        flex-grow: 0;
+        flex-shrink: 0;
     }
 }
 
 @media (max-width: 600px) {
+    .sidebar.collapsed {
+        width: 60px !important;
+        min-width: 60px !important;
+    }
+
     .sidebar:not(.collapsed) {
-        width: 85vw;
-        min-width: 0;
+        width: 85vw !important;
+        min-width: 0 !important;
     }
 
     .main-content {
+        margin-left: 60px !important;
+        width: calc(100vw - 60px) !important;
         padding: 20px 14px;
     }
 

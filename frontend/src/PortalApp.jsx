@@ -53,47 +53,42 @@ export function PortalApp() {
             <span className="bar"></span>
           </button>
         </div>
-
-        {!isCollapsed && (
-          <>
-            <nav className="nav-links">
-              <div className="nav-section">
-                <div className="nav-section-title">Buchungsportal</div>
-                {PORTAL_NAV_ITEMS.map((item) => (
-                  <NavLink
-                    key={item.path}
-                    to={item.path}
-                    className="nav-button"
-                    onClick={() => {
-                      if (window.innerWidth <= 1200) setIsCollapsed(true);
-                    }}
-                  >
-                    <span className="bullet-dot">•</span>
-                    {item.label}
-                  </NavLink>
-                ))}
-              </div>
-            </nav>
-
-            {/* SWITCH-BUTTON ZUR ADMIN-ANSICHT */}
-            <div className="sidebar-footer">
+        <nav className="nav-links">
+          <div className="nav-section">
+            <div className="nav-section-title">Buchungsportal</div>
+            {PORTAL_NAV_ITEMS.map((item) => (
               <NavLink
-                to="/dashboard"
+                key={item.path}
+                to={item.path}
                 className="nav-button"
-                style={{
-                  fontWeight: "600",
-                  color: "#dc2626",
-                }}
                 onClick={() => {
                   if (window.innerWidth <= 1200) setIsCollapsed(true);
                 }}
               >
-                <span className="bullet-dot">🔒</span>
-                Zur Admin-Ansicht
+                <span className="bullet-dot">•</span>
+                {item.label}
               </NavLink>
-            </div>
-          </>
-        )}
+            ))}
+          </div>
+        </nav>
+
+        {/* SWITCH-BUTTON ZUR ADMIN-ANSICHT */}
+        <div className="sidebar-footer">
+          <NavLink
+            to="/dashboard"
+            className="nav-button"
+            style={{
+              fontWeight: "600",
+              color: "#dc2626",
+            }}
+            onClick={() => {
+              if (window.innerWidth <= 1200) setIsCollapsed(true);
+            }}
+          >
+            <span className="bullet-dot">🔒</span>
+            Zur Admin-Ansicht
+          </NavLink>
+        </div>
       </aside>
 
       <main className="main-content">

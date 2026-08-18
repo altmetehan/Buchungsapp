@@ -124,77 +124,72 @@ export function AdminApp() {
             )}
           </button>
         </div>
+        <nav className="nav-links">
+          {NAV_SECTIONS.map((section, idx) => (
+            <div key={section.title} className="nav-section">
+              {idx > 0 && <div className="nav-divider" />}
+              <div className="nav-section-title">{section.title}</div>
+              {section.items.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className="nav-button"
+                  style={{ display: "flex", alignItems: "center" }}
+                  onClick={() => {
+                    if (window.innerWidth <= 1200) setIsCollapsed(true);
+                  }}
+                >
+                  <span className="bullet-dot">•</span>
+                  <span style={{ flex: 1 }}>{item.label}</span>
 
-        {!isCollapsed && (
-          <>
-            <nav className="nav-links">
-              {NAV_SECTIONS.map((section, idx) => (
-                <div key={section.title} className="nav-section">
-                  {idx > 0 && <div className="nav-divider" />}
-                  <div className="nav-section-title">{section.title}</div>
-                  {section.items.map((item) => (
-                    <NavLink
-                      key={item.path}
-                      to={item.path}
-                      className="nav-button"
-                      style={{ display: "flex", alignItems: "center" }}
-                      onClick={() => {
-                        if (window.innerWidth <= 1200) setIsCollapsed(true);
+                  {item.path === "/anfragen" && offeneAnfragenAnzahl > 0 && (
+                    <span
+                      style={{
+                        backgroundColor: "#ef4444",
+                        color: "#ffffff",
+                        fontSize: "11px",
+                        fontWeight: "bold",
+                        borderRadius: "10px",
+                        padding: "2px 7px",
+                        marginLeft: "auto",
                       }}
                     >
-                      <span className="bullet-dot">•</span>
-                      <span style={{ flex: 1 }}>{item.label}</span>
-
-                      {item.path === "/anfragen" && offeneAnfragenAnzahl > 0 && (
-                        <span
-                          style={{
-                            backgroundColor: "#ef4444",
-                            color: "#ffffff",
-                            fontSize: "11px",
-                            fontWeight: "bold",
-                            borderRadius: "10px",
-                            padding: "2px 7px",
-                            marginLeft: "auto",
-                          }}
-                        >
-                          {offeneAnfragenAnzahl}
-                        </span>
-                      )}
-                    </NavLink>
-                  ))}
-                </div>
+                      {offeneAnfragenAnzahl}
+                    </span>
+                  )}
+                </NavLink>
               ))}
-            </nav>
-
-            <div className="sidebar-footer">
-              <NavLink
-                to="/einstellungen"
-                className="nav-button"
-                onClick={() => {
-                  if (window.innerWidth <= 1200) setIsCollapsed(true);
-                }}
-              >
-                <span className="bullet-dot">⚙</span>
-                Einstellungen
-              </NavLink>
-              <NavLink
-                to="/portal"
-                className="nav-button"
-                style={{
-                  marginTop: "6px",
-                  fontWeight: "600",
-                  color: "#2563eb",
-                }}
-                onClick={() => {
-                  if (window.innerWidth <= 1200) setIsCollapsed(true);
-                }}
-              >
-                <span className="bullet-dot">🌐</span>
-                Zur Gäste-Ansicht
-              </NavLink>
             </div>
-          </>
-        )}
+          ))}
+        </nav>
+
+        <div className="sidebar-footer">
+          <NavLink
+            to="/einstellungen"
+            className="nav-button"
+            onClick={() => {
+              if (window.innerWidth <= 1200) setIsCollapsed(true);
+            }}
+          >
+            <span className="bullet-dot">⚙</span>
+            Einstellungen
+          </NavLink>
+          <NavLink
+            to="/portal"
+            className="nav-button"
+            style={{
+              marginTop: "6px",
+              fontWeight: "600",
+              color: "#2563eb",
+            }}
+            onClick={() => {
+              if (window.innerWidth <= 1200) setIsCollapsed(true);
+            }}
+          >
+            <span className="bullet-dot">🌐</span>
+            Zur Gäste-Ansicht
+          </NavLink>
+        </div>
       </aside>
 
       <main className="main-content">

@@ -156,7 +156,7 @@ export function Rechnungen() {
     { value: 11, label: "Dezember" },
   ];
 
-  const jahre = [2025, 2026, 2027, 2028, 2029, 2030];
+  const jahre = [2026, 2027, 2028, 2029, 2030, 2031];
   const monatName = monate.find((m) => m.value === selectedMonth)?.label || "";
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -640,7 +640,7 @@ export function Rechnungen() {
                     </div>
 
                     <div className="input-group">
-                      <label>Anpassung (%)</label>
+                      <label>Rabatt (%)</label>
                       <input
                         type="number"
                         step="0.01"

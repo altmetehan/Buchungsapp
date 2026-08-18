@@ -599,8 +599,88 @@
     font-size: 13px;
 }
 
-@media (min-width: 768px) and (max-width: 1200px) {
-  html, body {
-    font-size: 10px !important;
-  }
+/* --- MODAL SCROLL-SCHUTZ FÜR IPAD --- */
+.modal-content {
+    max-height: 92vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* ==========================================================================
+   RESPONSIVE GRID & STATS FÜR IPAD AIR
+   ========================================================================== */
+
+/* iPad Air Landscape & Portrait (768px - 1200px) */
+@media (max-width: 1200px) {
+    .stats-container {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px 0;
+        padding: 16px 0;
+    }
+
+    .stats-item {
+        padding: 8px 24px;
+    }
+
+    /* Trennstriche auf iPad neu ausrichten */
+    .stats-item:nth-child(3n) {
+        border-right: none !important;
+    }
+
+    .filter-bar {
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .search-input {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    /* Card-Box Tabellen auf Tablet touch-scrollbar machen */
+    .card-box .scroll-box {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* iPad Portrait & Handys (<= 900px) */
+@media (max-width: 900px) {
+    .stats-container {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .stats-item:nth-child(3n) {
+        border-right: 1px solid #000000;
+    }
+
+    .stats-item:nth-child(2n) {
+        border-right: none !important;
+    }
+
+    .details-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .detail-card-block-full {
+        grid-column: span 1;
+    }
+}
+
+/* Smartphones (<= 600px) */
+@media (max-width: 600px) {
+    .stats-container {
+        grid-template-columns: 1fr;
+    }
+
+    .stats-item {
+        border-right: none !important;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        padding: 12px 20px;
+    }
+
+    .stats-item:last-child {
+        border-bottom: none;
+    }
 }

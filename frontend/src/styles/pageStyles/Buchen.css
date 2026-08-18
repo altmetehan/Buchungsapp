@@ -444,61 +444,42 @@
     color: #e30000;
 }
 
-
 /* ==========================================================================
-   RESPONSIVE: TABLET & HANDY
+   BUCHEN: IPAD AIR ANPASSUNG
    ========================================================================== */
 @media (max-width: 1200px) {
-    /* Der 360px-Sidebar-Kalender + 1fr-Verfügbarkeitsliste nebeneinander
-       ergibt auf einem Tablet/Handy keinen Sinn mehr - der Kalender würde
-       entweder winzig oder die Liste hätte keinen Platz. Stattdessen
-       untereinander, Kalender zuerst (das ist der erste Schritt des Flows). */
+    /* iPad Air Landscape (1180px): Kalender links etwas kompakter, Liste rechts */
+    .booking-main-grid {
+        grid-template-columns: 320px 1fr;
+        gap: 20px;
+    }
+}
+
+@media (max-width: 950px) {
+    /* iPad Air Portrait (820px): Untereinander stapeln */
     .booking-main-grid {
         grid-template-columns: 1fr;
     }
 
-    /* ANREISE / ABREISE / GÄSTE nebeneinander -> auf schmalen Screens
-       lieber drei volle Zeilen, sonst sind die Datumsfelder kaum noch lesbar. */
+    .sidebar-calendar-box {
+        max-width: 480px;
+        margin: 0 auto;
+        width: 100%;
+    }
+
     .booking-search-bar {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .search-field:not(:last-child) {
-        border-right: none;
-        border-bottom: 1px solid #e4e4e7;
-        padding-bottom: 12px;
-        margin-bottom: 4px;
-    }
-
-    /* Jede Verfügbarkeitszeile (Objekt | Info | Status | Preis | Buchen)
-       hat 5 nebeneinanderliegende Spalten - bricht auf schmalen Screens
-       zu einem übersichtlichen Block um, statt Text abzuschneiden. */
-    .availability-row {
         grid-template-columns: 1fr;
-        row-gap: 6px;
-        justify-items: start;
+        padding: 10px 0;
+        gap: 8px;
     }
 
-    .obj-info {
-        margin-right: 0;
+    .search-field {
+        padding: 10px 24px;
+        border-right: none !important;
+        border-bottom: 1px solid #e4e4e7;
     }
 
-    .obj-objekt-info {
-        padding-right: 0;
-    }
-
-    .btn-action-book {
-        justify-self: stretch;
-        text-align: center;
-        margin-top: 6px;
-    }
-
-    /* Die editierbare Zusammenfassungs-Leiste (Objekt/Zeitraum/Gäste/Preis)
-       bricht auf schmalen Screens in zwei Zeilen um, statt vier Felder in
-       eine enge Reihe zu quetschen. */
-    .booking-summary-bar {
-        flex-wrap: wrap;
-        gap: 16px;
+    .search-field:last-child {
+        border-bottom: none;
     }
 }

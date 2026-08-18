@@ -137,21 +137,27 @@
     display: flex;
     gap: 12px;
     align-items: center;
+    flex-shrink: 0;
+    width: auto;
 }
 
+/* Status-Button (weiß / dezent) */
 .btn-anfragen-status {
     background-color: #ffffff;
     border: 1px solid #e4e4e7;
     color: #71717a;
     font-weight: 600;
-    font-size: 14px;
-    padding: 13px 20px;
+    font-size: 13px;
+    padding: 14px 14px;    /* Kompakteres Padding */
     border-radius: 8px;
     cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
+    transition: all 0.15s ease;
+    display: inline-flex;
     align-items: center;
     gap: 8px;
+    white-space: nowrap;
+    width: auto;           /* Nur so breit wie der Inhalt */
+    flex: initial;         /* Kein automatisches Strecken */
 }
 
 .btn-anfragen-status:hover {
@@ -159,6 +165,7 @@
     border-color: #b0b0b5;
 }
 
+/* Zustand: Offene Anfragen vorhanden */
 .btn-anfragen-status--active {
     background-color: #ff000012;
     border-color: #e30000;
@@ -186,40 +193,36 @@
     color: #ef000090;
 }
 
-/* --- RESPONSIVE --- */
-@media (max-width: 900px) {
-    .dashboard-card-list {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
 
-    .dashboard-card-list [class*="grid-"] {
-        min-width: 640px;
-    }
-
+/* ==========================================================================
+   RESPONSIVE: KEIN STRECKEN AUF TABLETS
+   ========================================================================== */
+@media (max-width: 1200px) {
     .dashboard-header-actions {
-        flex-wrap: wrap;
-        width: 100%;
+        flex-wrap: nowrap;
+        width: auto;
     }
 
+    /* Aufhebeln eventueller flex: 1 Vererbungen */
     .dashboard-header-actions > * {
-        flex: 1;
-        min-width: 220px;
+        flex: initial !important;
+        min-width: auto !important;
     }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
+    /* Erst auf echten Smartphone-Breiten untereinander anordnen */
     .dashboard-header-actions {
         flex-direction: column;
+        align-items: stretch;
         width: 100%;
+        gap: 8px;
+        margin-top: 12px;
     }
 
-    .btn-anfragen-status {
+    .btn-anfragen-status,
+    .dashboard-header-actions .btn-primary {
         width: 100%;
         justify-content: center;
-    }
-
-    .stats-item--divider {
-        border-right: none;
     }
 }

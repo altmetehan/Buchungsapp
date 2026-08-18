@@ -8,7 +8,7 @@
 
 /* Spaltenbreiten: ID | Name | E-Mail | Telefon | Adresse | Aktionen */
 .grid-guests {
-    grid-template-columns: 60px 180px 220px 130px 1fr 220px;
+    grid-template-columns: 60px 180px 220px 150px 1fr 220px;
     gap: 20px;
 }
 
