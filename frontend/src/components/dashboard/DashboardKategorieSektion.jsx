@@ -80,13 +80,15 @@ export function DashboardKategorieSektion({
 
           return (
             <div key={obj.id} className={`list-row grid-status ${statusClass}`}>
-              <span className="row-title">{obj.name}
-                {live.zusatz && (
-                  <span className="row-zusatz-badge">
-                    + {live.zusatz}
-                  </span>
-                )}
-              </span>
+            <span className="row-title">
+              {obj.name}
+              {live.zusatz && <span className="row-zusatz-badge">+ {live.zusatz}</span>}
+              {live.kombiMit && (
+                <span className="row-zusatz-badge" >
+                  (mit {live.kombiMit})
+                </span>
+              )}
+            </span>
               <span className={`tag ${live.status}`}>
                 {live.status} <span className="sub-date">{live.subDate}</span>
               </span>

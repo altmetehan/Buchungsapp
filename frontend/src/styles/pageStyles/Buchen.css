@@ -45,50 +45,45 @@
    Datumsfelder sind hier bewusst nur "read-only Anzeige", die Auswahl
    passiert komplett über den Kalender links. */
 .booking-search-bar {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr); /* 3 gleich große Spalten ohne Leerraum rechts */
     background-color: #00000010;
     border: 1px solid #e4e4e7;
     border-radius: 12px;
-    padding: 8px;
+    padding: 18px 0;                       /* Gibt den Trennlinien oben & unten Luft */
     margin-top: 24px;
     margin-bottom: 30px;
     align-items: center;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.02);
-}
-
-.booking-search-bar .date-display-only {
-    cursor: default !important;
-}
-
-.booking-main-grid {
-    display: grid;
-    grid-template-columns: 360px 1fr;
-    gap: 24px;
-    align-items: start; /* Verhindert das unschöne Strecken nach unten */
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
 }
 
 .search-field {
-    flex: 1;
-    padding: 8px 24px;
     display: flex;
     flex-direction: column;
+    justify-content: center;
+    padding: 0 35px;                       /* Gleicher horizontaler Abstand wie bei Stats */
     text-align: left;
+    height: 100%;
 }
 
+/* Identische Trennlinie wie in der Statistik-Leiste */
 .search-field:not(:last-child) {
-    border-right: 1px solid #e4e4e7;
+    border-right: 1px solid #000000;
 }
 
 .search-field span {
     font-size: 11px;
-    color: #a1a1aa;
+    color: #71717a;
     font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
     margin-bottom: 4px;
 }
 
 .search-field strong {
-    font-size: 16px;
+    font-size: 15px;
     color: #111111;
+    font-weight: 700;
 }
 
 
@@ -116,7 +111,7 @@
 
 .availability-row {
     display: grid;
-    grid-template-columns: 1fr 240px 180px 180px auto;
+    grid-template-columns: 1fr 280px 180px 180px auto;
     padding: 16px 24px;
     align-items: center;
     border-bottom: 1px solid #e4e4e7;

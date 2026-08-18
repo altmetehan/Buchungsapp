@@ -197,22 +197,32 @@ export function Dashboard() {
 
       return nowStr >= startFull && nowStr <= endFull;
     });
-
+    
     if (activeBooking) {
-      const zusatzInfo =
-        activeBooking.zusatzobjektName && activeBooking.zusatzobjektName.toLowerCase() !== nameLower
-          ? activeBooking.zusatzobjektName
-          : null;
+    const isHauptobjekt = activeBooking.resource?.toLowerCase() === nameLower;
+    const isZusatzobjekt = activeBooking.zusatzobjektName?.toLowerCase() === nameLower;
 
-      return {
-        status: "belegt",
-        guest: activeBooking.guestName,
-        zusatz: zusatzInfo,
-        subDate: `bis ${formatDe(parseISO(activeBooking.end))}${
-          activeBooking.abreiseZeit ? ` (${activeBooking.abreiseZeit} Uhr)` : ""
-        }`,
-      };
+    // Wenn Wohnung -> zeigt "+ Vito Bus"
+    // Wenn Zusatzobjekt (Bus) -> zeigt "(mit Wohnung 1)"
+    let zusatz = null;
+    let kombiMit = null;
+
+    if (isHauptobjekt && activeBooking.zusatzobjektName) {
+      zusatz = activeBooking.zusatzobjektName;
+    } else if (isZusatzobjekt && activeBooking.resource) {
+      kombiMit = activeBooking.resource;
     }
+
+    return {
+      status: "belegt",
+      guest: activeBooking.guestName,
+      zusatz,
+      kombiMit, // z. B. "Wohnung 1"
+      subDate: `bis ${formatDe(parseISO(activeBooking.end))}${
+        activeBooking.abreiseZeit ? ` (${activeBooking.abreiseZeit} Uhr)` : ""
+      }`,
+    };
+  }
 
     const futureBookings = reservations
       .filter((b) => {

@@ -42,12 +42,12 @@
 }
 
 .grid-status {
-    grid-template-columns: 240px 280px 1fr 90px;
+    grid-template-columns: 295px 280px 1fr 90px;
     gap: 10px;
 }
 
 .grid-arrival {
-    grid-template-columns: 240px 280px 1fr 90px;
+    grid-template-columns: 300px 280px 1fr 90px;
     gap: 10px;
 }
 
