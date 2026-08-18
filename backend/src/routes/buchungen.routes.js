@@ -5,7 +5,7 @@ import { broadcast } from "../ws.js";
 import { renderToBuffer } from "@react-pdf/renderer";
 import React from "react";
 import { RechnungDocument } from "../pdf/RechnungDocument.js";
-import { BuchungsbestaetigungDocument } from "../pdf/BuchungsBestaetigungDocument.js";
+import { BuchungsbestaetigungDocument } from "../pdf/BuchungsbestaetigungDocument.js";
 
 const router = Router();
 
@@ -100,11 +100,23 @@ router.put("/:id", async (req, res) => {
 // DELETE /api/buchungen/:id - Soft-Delete (markiert die Buchung als gelöscht)
 router.delete("/:id", async (req, res) => {
   try {
-    await prisma.buchungen.update({
-      where: { id: Number(req.params.id) },
-      data: { geloescht_am: new Date() },
-    });
+    const buchungId = Number(req.params.id);
+
+    await prisma.$transaction([
+      // 1. Buchung als gelöscht markieren
+      prisma.buchungen.update({
+        where: { id: buchungId },
+        data: { geloescht_am: new Date() },
+      }),
+      // 2. Zugehörige Rechnung(en) automatisch löschen
+      prisma.rechnungen.deleteMany({
+        where: { buchung_id: buchungId },
+      }),
+    ]);
+
+    // Live-Update für Buchungen UND Rechnungen an alle Clients senden
     broadcast("buchungen:changed");
+    broadcast("rechnungen:changed");
     res.status(204).send();
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -118,11 +130,16 @@ router.delete("/:id", async (req, res) => {
 // zu holen.
 router.get("/:id/preisanpassungen", async (req, res) => {
   try {
-    const anpassungen = await prisma.preisanpassungen.findMany({
-      where: { buchung_id: Number(req.params.id) },
-      orderBy: { erstellt_am: "desc" },
+    const rechnungen = await prisma.rechnungen.findMany({
+      where: {
+        Buchungen: {
+          geloescht_am: null,
+        },
+      },
+      ...MIT_BUCHUNG_GAST_UND_OBJEKT,
+      orderBy: { id: "asc" },
     });
-    res.json(anpassungen);
+    res.json(rechnungen);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

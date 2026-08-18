@@ -1,507 +1,538 @@
-// backend/src/pdf/RechnungDocument.js
-import React from "react";
-import path from "path";
-import { fileURLToPath } from "url";
-import { Document, Page, Text, View, Image, StyleSheet } from "@react-pdf/renderer";
+import React from 'react';
+import { Document, Page, Text, View, Image, StyleSheet } from '@react-pdf/renderer';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 
-/**
- * RechnungDocument.js
- * --------------------
- * Baut das PDF-Layout einer einzelnen Rechnung.
- *
- * LAYOUT-VORBILD: der echte Beckhoff-Lieferschein - bewusst KEIN
- * dichtes Tabellenraster mehr, sondern viel Weißraum, dünne graue
- * Trennlinien statt Boxen, ein "Ihre Daten"/"Rechnungsdaten"-
- * Zweispalten-Block mit unterstrichenen Abschnittstiteln, und
- * Positionsblöcke mit fett gesetzter Bezeichnung + grauen Detailzeilen
- * darunter (genau wie beim Lieferschein: Art-Nr., Beschreibung,
- * Ursprungsland, ... - hier eben Objektbeschreibung, Zeitraum,
- * Berechnungsgrundlage). Beckhoff-Rot (#e30000) wird bewusst SPARSAM
- * eingesetzt (~20%): nur als Trennlinie unter dem Kopf, für die
- * Positionsnummern und für den Gesamtbetrag - der Rest bleibt
- * Schwarz/Grau wie im Original.
- *
- * WICHTIG: Diese Datei nutzt bewusst KEIN JSX, weil das Backend reines
- * Node/ESM ist und keinen Build-Schritt durchläuft. "e" ist die kurze
- * Abkürzung für React.createElement.
- *
- * LOGO: liegt lokal im Backend unter src/assets/logo-rot.jpg.
- */
-const e = React.createElement;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const LOGO_PATH = path.join(__dirname, "../assets/logo-rot.jpg");
+function getLogoBase64() {
+  const possiblePaths = [
+    path.join(__dirname, '../assets/logorot.jpg'),
+    path.join(__dirname, '../assets/logorot.png'),
+    path.join(__dirname, '../../assets/logorot.jpg'),
+    path.join(process.cwd(), 'src/assets/logorot.jpg'),
+    path.join(process.cwd(), 'assets/logorot.jpg'),
+    path.join(__dirname, '../../../frontend/src/assets/logorot.jpg'),
+    path.join(__dirname, '../assets/logoschwarz.png'),
+  ];
 
-// ─── ZENTRALE FIRMENDATEN (Beckhoff Automation GmbH, Österreich) ───
-const FIRMA = {
-  name: "Beckhoff Automation GmbH",
-  strasse: "Hauptstraße 11",
-  ort: "6706 Bürs",
-  land: "Österreich",
-  telefon: "+43 5552 688-0",
-  email: "office@beckhoff-verwaltung.at",
-  web: "www.beckhoff.com",
-  uid: "ATU54127804",
-  firmenbuch: "FN 222233p",
-  gericht: "Landesgericht Feldkirch",
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      try {
+        const ext = path.extname(p).toLowerCase() === '.png' ? 'png' : 'jpeg';
+        const fileBuffer = fs.readFileSync(p);
+        return `data:image/${ext};base64,${fileBuffer.toString('base64')}`;
+      } catch (err) {
+        console.error(`[PDF] Fehler beim Lesen von ${p}:`, err);
+      }
+    }
+  }
+  return null;
+}
+
+const h = React.createElement;
+
+const COLORS = {
+  primary: '#E30000',       // Beckhoff Rot
+  textPrimary: '#18181B',   // Tiefes Anthrazit
+  textSecondary: '#52525B', // Neutrales Dunkelgrau
+  textMuted: '#8E8E93',     // Dezent für Meta/Linien
+  borderLight: '#E4E4E7',
+  borderDark: '#27272A',
+  white: '#FFFFFF',
 };
-
-const ROT = "#e30000"; // bewusst sparsam eingesetzter Beckhoff-Rot-Akzent
-const SCHWARZ = "#111111";
-const GRAU = "#555555";
-const GRAU_HELL = "#8f8f8f";
-const LINIE_HELL = "#d8d8d8";
 
 const styles = StyleSheet.create({
   page: {
-    paddingTop: 42,
-    paddingHorizontal: 46,
-    paddingBottom: 58,
-    fontSize: 9,
-    fontFamily: "Helvetica",
-    color: SCHWARZ,
+    fontFamily: 'Helvetica',
+    fontSize: 9.5,
+    lineHeight: 1.5,
+    color: COLORS.textPrimary,
+    paddingTop: 40,
+    paddingBottom: 85,
+    paddingHorizontal: 45,
+    backgroundColor: COLORS.white,
+  },
+
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 28,
+  },
+  logo: {
+    width: 140,
+    height: 38,
+    objectFit: 'contain',
+  },
+  brandTextFallback: {
+    fontFamily: 'Helvetica-Bold',
+    fontSize: 18,
+    color: COLORS.primary,
+    letterSpacing: 0.5,
+  },
+  companyHeaderRight: {
+    alignItems: 'flex-end',
+  },
+  companyNameHeader: {
+    fontFamily: 'Helvetica-Bold',
+    fontSize: 10,
+    color: COLORS.textPrimary,
+  },
+  companySubHeader: {
+    fontSize: 8,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+
+  letterHeadRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 28,
+    minHeight: 105,
+  },
+  addressCol: {
+    width: '55%',
+  },
+  senderSmall: {
+    fontSize: 7.5,
+    color: COLORS.textMuted,
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  recipientName: {
+    fontFamily: 'Helvetica-Bold',
+    fontSize: 10.5,
+    color: COLORS.textPrimary,
+    marginBottom: 2,
+  },
+  recipientLine: {
+    fontSize: 9.5,
+    color: COLORS.textPrimary,
+    lineHeight: 1.35,
+  },
+
+  metaCol: {
+    width: '40%',
+    paddingLeft: 10,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 2.5,
+    paddingBottom: 0,
+    borderBottomWidth: 0.5,
+    borderBottomColor: COLORS.textMuted,
+  },
+  metaRowLast: {    
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 2.5,
+    paddingBottom: 0,
+  },
+  metaLabel: {
+    fontSize: 8.5,
+    color: COLORS.textSecondary,
+  },
+  metaValue: {
+    fontSize: 8.5,
+    fontFamily: 'Helvetica-Bold',
+    color: COLORS.textPrimary,
+  },
+
+  docTitle: {
+    fontFamily: 'Helvetica-Bold',
+    fontSize: 15,
+    color: COLORS.textPrimary,
+    marginBottom: 10,
+  },
+  introText: {
+    fontSize: 9.5,
+    color: COLORS.textSecondary,
+    marginBottom: 20,
     lineHeight: 1.4,
   },
 
-  // ─── KOPFZEILE: LOGO LINKS, TAGLINE RECHTS ───
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 30,
+  table: {
+    width: '100%',
+    marginBottom: 20,
   },
-  logo: { width: 118, height: 22 },
-  tagline: {
-    fontSize: 9,
-    color: GRAU,
-    fontFamily: "Helvetica-Bold",
-  },
-
-  // ─── ADRESSZEILE (klein, grau, unterstrichen - Fensterbrief-Konvention) ───
-  kurzAdresse: {
-    fontSize: 6.5,
-    color: GRAU_HELL,
-    textDecoration: "underline",
-    marginBottom: 14,
-  },
-
-  // ─── EMPFÄNGER LINKS / DOKUMENTTITEL + META RECHTS ───
-  obererBereich: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 30,
-  },
-  empfaengerSpalte: { width: "52%" },
-  empfaengerName: { fontSize: 9.5, fontFamily: "Helvetica-Bold", marginBottom: 2 },
-  empfaengerZeile: { fontSize: 9 },
-
-  metaSpalte: { alignItems: "flex-end" },
-  dokumentTitel: {
-    fontSize: 17,
-    fontFamily: "Helvetica-Bold",
-    marginBottom: 8,
-  },
-  metaZeile: { flexDirection: "row", marginBottom: 2 },
-  metaLabel: { fontSize: 8.5, color: GRAU, width: 95, textAlign: "right", marginRight: 10 },
-  metaWert: { fontSize: 8.5, fontFamily: "Helvetica-Bold", textAlign: "right" },
-
-  // Dünne rote Trennlinie unter dem oberen Bereich - der einzige
-  // größere Rot-Einsatz im Dokument, statt der massiven roten Balken
-  // aus vorherigen Entwürfen.
-  trennlinieRot: {
-    borderBottomWidth: 1.4,
-    borderBottomColor: ROT,
-    borderBottomStyle: "solid",
-    marginBottom: 26,
-  },
-
-  // ─── "IHRE DATEN" / "RECHNUNGSDATEN" ZWEISPALTEN-BLOCK ───
-  datenBereich: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 32,
-  },
-  datenSpalte: { width: "46%" },
-  abschnittTitel: {
-    fontSize: 9,
-    fontFamily: "Helvetica-Bold",
-    marginBottom: 8,
-    paddingBottom: 3,
+  tableHeader: {
+    flexDirection: 'row',
     borderBottomWidth: 1,
-    borderBottomColor: SCHWARZ,
-    borderBottomStyle: "solid",
-    width: "70%",
+    borderBottomColor: COLORS.borderDark,
+    paddingBottom: 6,
+    paddingHorizontal: 2,
   },
-  datenZeile: { flexDirection: "row", marginBottom: 5 },
-  datenLabel: { fontSize: 8.5, color: GRAU, width: "48%" },
-  datenWert: { fontSize: 8.5, fontFamily: "Helvetica-Bold", width: "52%" },
+  th: {
+    fontFamily: 'Helvetica-Bold',
+    fontSize: 8.5,
+    color: COLORS.textPrimary,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 0.5,
+    borderBottomColor: COLORS.borderLight,
+    paddingVertical: 9,
+    paddingHorizontal: 2,
+  },
+  colPos: { width: '6%' },
+  colDesc: { width: '50%' },
+  colQty: { width: '14%', textAlign: 'right' },
+  colPrice: { width: '15%', textAlign: 'right' },
+  colTotal: { width: '15%', textAlign: 'right' },
 
-  // ─── POSITIONSTABELLE: KOPFZEILE ───
-  posKopfRow: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: SCHWARZ,
-    borderBottomStyle: "solid",
-    paddingBottom: 5,
-    marginBottom: 4,
+  itemTitle: {
+    fontFamily: 'Helvetica-Bold',
+    fontSize: 9.5,
+    color: COLORS.textPrimary,
   },
-  colPos: { width: "9%" },
-  colBezeichnung: { width: "56%" },
-  colZeitraum: { width: "20%" },
-  colBetrag: { width: "15%", textAlign: "right" },
-  posKopfText: {
-    fontSize: 7.5,
-    fontFamily: "Helvetica-Bold",
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-    color: GRAU,
-  },
-
-  // ─── EINZELNE POSITION (fett + graue Detailzeilen, wie im Lieferschein) ───
-  posBlock: {
-    flexDirection: "row",
-    paddingVertical: 12,
-    borderBottomWidth: 0.75,
-    borderBottomColor: LINIE_HELL,
-    borderBottomStyle: "solid",
-  },
-  posNummer: {
-    fontSize: 9,
-    fontFamily: "Helvetica-Bold",
-    color: ROT, // kleiner, gezielter Rot-Akzent an der Positionsnummer
-  },
-  posName: { fontSize: 10, fontFamily: "Helvetica-Bold", marginBottom: 3 },
-  posDetailZeile: { fontSize: 8, color: GRAU, marginBottom: 1.5 },
-  posZeitraumText: { fontSize: 8.5, color: GRAU },
-  posBetragText: { fontSize: 9.5, fontFamily: "Helvetica-Bold", textAlign: "right" },
-
-  // ─── SUMMENBLOCK ───
-  summenBereich: { alignItems: "flex-end", marginTop: 4 },
-  summenZeile: {
-    flexDirection: "row",
-    width: "42%",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingTop: 10,
-    borderTopWidth: 1.4,
-    borderTopColor: SCHWARZ,
-    borderTopStyle: "solid",
-  },
-  summenLabel: { fontSize: 10, fontFamily: "Helvetica-Bold" },
-  summenWert: { fontSize: 13, fontFamily: "Helvetica-Bold", color: ROT },
-
-  // ─── PREISANPASSUNGEN ───
-  anpassungenBlock: { marginTop: 28 },
-  anpassungenTitel: {
+  itemSubtitle: {
     fontSize: 8,
-    fontFamily: "Helvetica-Bold",
-    marginBottom: 6,
-    color: GRAU,
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
+    color: COLORS.textSecondary,
+    marginTop: 2,
   },
-  anpassungZeile: { fontSize: 8, marginBottom: 3, color: GRAU },
 
-  // ─── SCHLUSSTEXT ───
-  schlussText: { marginTop: 34, fontSize: 9 },
-  gruss: { marginTop: 18, fontSize: 9 },
+  totalsSection: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: 25,
+  },
+  totalsTable: {
+    width: '45%',
+  },
+  totalsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 3,
+  },
+  totalsLabel: {
+    fontSize: 9,
+    color: COLORS.textSecondary,
+  },
+  totalsValue: {
+    fontSize: 9,
+    color: COLORS.textPrimary,
+  },
+  grandTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderDark,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderDark,
+    marginTop: 6,
+    paddingVertical: 5,
+  },
+  grandTotalLabel: {
+    fontFamily: 'Helvetica-Bold',
+    fontSize: 10.5,
+    color: COLORS.textPrimary,
+  },
+  grandTotalValue: {
+    fontFamily: 'Helvetica-Bold',
+    fontSize: 11,
+    color: COLORS.primary,
+  },
 
-  // ─── FUSSZEILE: VIER SPALTEN MIT DÜNNEN TRENNLINIEN (wie im Original) ───
+  paymentTerms: {
+    borderLeftWidth: 2,
+    borderLeftColor: COLORS.primary,
+    paddingLeft: 10,
+    marginVertical: 14,
+  },
+  paymentText: {
+    fontSize: 8.5,
+    color: COLORS.textSecondary,
+    lineHeight: 1.45,
+  },
+
   footer: {
-    position: "absolute",
-    bottom: 28,
-    left: 46,
-    right: 46,
-    flexDirection: "row",
-    borderTopWidth: 0.75,
-    borderTopColor: LINIE_HELL,
-    borderTopStyle: "solid",
-    paddingTop: 8,
+    position: 'absolute',
+    bottom: 25,
+    left: 45,
+    width: 505,
+    borderTopWidth: 0.5,
+    borderTopColor: COLORS.borderLight,
+    paddingTop: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
-  footerSpalte: {
+  footerCol: {
     flex: 1,
-    paddingRight: 10,
-    borderRightWidth: 0.5,
-    borderRightColor: LINIE_HELL,
-    borderRightStyle: "solid",
+    paddingRight: 15,
   },
-  footerSpalteLetzte: { flex: 1, paddingLeft: 10 },
-  footerZeile: { fontSize: 7, color: GRAU, lineHeight: 1.5 },
+  footerHeading: {
+    fontFamily: 'Helvetica-Bold',
+    fontSize: 7.5,
+    color: COLORS.textPrimary,
+    marginBottom: 3,
+  },
+  footerText: {
+    fontSize: 7,
+    color: COLORS.textSecondary,
+    lineHeight: 1.35,
+  },
+  pageNumber: {
+    fontSize: 7,
+    color: COLORS.textMuted,
+    marginTop: 4,
+  },
 });
 
-/** Formatiert eine Zahl als "€ 1.234,50". */
-const formatEuro = (zahl) =>
-  new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(zahl || 0);
+const formatCurrency = (val) => {
+  const num = typeof val === 'number' ? val : parseFloat(val) || 0;
+  return num.toLocaleString('de-AT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+};
 
-/** Formatiert einen ISO-Zeitstempel als "DD.MM.YYYY". */
-const formatZeitstempelKurz = (isoStr) => (isoStr ? new Date(isoStr).toLocaleDateString("de-DE") : "");
+const formatDate = (dateStr) => {
+  if (!dateStr) return '-';
+  if (dateStr.includes('.')) return dateStr;
+  const [y, m, d] = dateStr.split('-');
+  if (!y || !m || !d) return dateStr;
+  return `${d.padStart(2, '0')}.${m.padStart(2, '0')}.${y}`;
+};
 
-/** Alles außer einer Wohnung wird stundenweise abgerechnet. */
-const istStundenbasiert = (objektName) => !objektName?.toLowerCase().includes("wohnung");
+export function RechnungDocument({
+  rechnung = {},
+  buchung = {},
+  gast = null,
+  objekt = null,
+  rechnungsNummer = null,
+  rechnungsDatum = null,
+  faelligkeitsDatum = null,
+  logoSrc = null,
+  unternehmensDaten = {
+    name: 'Beckhoff Automation GmbH',
+    strasse: 'Hauptstraße 11',
+    plzOrt: '6706 Bürs',
+    land: 'Österreich',
+    email: 'info@beckhoff.at',
+    telefon: '+43 5552 68813-0',
+    web: 'www.beckhoff.com/de-at/',
+    iban: 'AT12 3456 7890 1234 5678',
+    bic: 'BKAUATWW',
+    bank: 'Sparkasse Feldkirch',
+    firmenbuch: 'FN 222233p, LG Feldkirch',
+    uid: 'ATU 54127804',
+  },
+}) {
+  const finalLogo = logoSrc || getLogoBase64();
+  const currentBuchung = buchung || rechnung?.Buchungen || {};
+  const currentGast = gast || currentBuchung?.Gaeste || {};
+  const currentObjekt = objekt || currentBuchung?.Objekte || {};
 
-/** "DD.MM.YYYY" -> Date-Objekt (lokal dupliziert, Backend/Frontend sind getrennte Umgebungen). */
-function parseGermanDate(str) {
-  if (!str) return null;
-  const [d, m, y] = str.split(".").map(Number);
-  return new Date(y, m - 1, d);
-}
+  const rNr = rechnungsNummer || rechnung?.rechnungs_nummer || 'RE-2026-0001';
+  const rDatum = rechnungsDatum || rechnung?.rechnungs_datum || currentBuchung?.abreise || new Date().toISOString().split('T')[0];
 
-/**
- * Baut die Berechnungsgrundlage als Textzeile, z.B. "7 Nächte × € 120,00"
- * oder "4,5 Stunden × € 15,50" - damit auf der Rechnung genau
- * nachvollziehbar ist, WAS in welcher Menge zum Preis pro Einheit
- * berechnet wurde (informativer Zusatz, der Gesamtpreis in der
- * Betrags-Spalte bleibt immer der tatsächlich gespeicherte
- * buchung.preis).
- */
-function berechnungsgrundlage(buchung, objekt, stundenbasiert) {
-  const einzelpreis = objekt?.preis;
-  if (!einzelpreis) return null;
+  const calcFaelligkeit = () => {
+    if (faelligkeitsDatum) return formatDate(faelligkeitsDatum);
+    if (rechnung?.faelligkeits_datum) return formatDate(rechnung.faelligkeits_datum);
+    const d = new Date(rDatum.includes('.') ? rDatum.split('.').reverse().join('-') : rDatum);
+    if (!isNaN(d.getTime())) {
+      d.setDate(d.getDate() + 14);
+      return formatDate(d.toISOString().split('T')[0]);
+    }
+    return '-';
+  };
 
-  if (stundenbasiert) {
-    const start = parseGermanDate(buchung.anreise);
-    const ende = parseGermanDate(buchung.abreise);
-    if (!start || !ende) return null;
-    const [sh, sm] = (buchung.anreise_zeit || "09:00").split(":").map(Number);
-    const [eh, em] = (buchung.abreise_zeit || "17:00").split(":").map(Number);
-    start.setHours(sh, sm, 0, 0);
-    ende.setHours(eh, em, 0, 0);
-    const stunden = Math.max(0, (ende - start) / (1000 * 60 * 60));
-    return `${stunden % 1 === 0 ? stunden.toFixed(0) : stunden.toFixed(1)} Stunden × ${formatEuro(einzelpreis)}`;
-  }
+  const isWohnung = Boolean(currentObjekt?.name?.toLowerCase().includes('wohnung'));
+  const gesamtpreis = Number(currentBuchung?.preis || 0);
 
-  const start = parseGermanDate(buchung.anreise);
-  const ende = parseGermanDate(buchung.abreise);
-  if (!start || !ende) return null;
-  const naechte = Math.max(1, Math.round((ende - start) / (1000 * 60 * 60 * 24)));
-  return `${naechte} ${naechte === 1 ? "Nacht" : "Nächte"} × ${formatEuro(einzelpreis)}`;
-}
+  const gastName = currentGast?.name || `${currentGast?.vorname || ''} ${currentGast?.nachname || ''}`.trim() || 'Gast';
+  const gastAdresse = currentGast?.strasse ? `${currentGast.strasse} ${currentGast.hnr || ''}`.trim() : 'Musterstraße 1';
+  const gastOrt = `${currentGast?.plz || '6700'} ${currentGast?.stadt || 'Bludenz'}`;
 
-/** Kopfzeile: Logo links, Tagline rechts, kleine unterstrichene Absenderzeile darunter. */
-function Kopfbereich() {
-  return e(
-    View,
-    null,
-    e(
-      View,
-      { style: styles.headerRow },
-      e(Image, { style: styles.logo, src: LOGO_PATH }),
-      e(Text, { style: styles.tagline }, "New Automation Technology"),
-    ),
-    e(
-      Text,
-      { style: styles.kurzAdresse },
-      `${FIRMA.name} · ${FIRMA.strasse} · ${FIRMA.ort} · ${FIRMA.land}`,
-    ),
-  );
-}
-
-/** Vierspaltige Fußzeile mit dünnen Trennlinien - Adresse / Kontakt / Geschäftsführung / Registerdaten. */
-function Fusszeile() {
-  return e(
-    View,
-    { style: styles.footer, fixed: true },
-    e(
-      View,
-      { style: styles.footerSpalte },
-      e(Text, { style: styles.footerZeile }, FIRMA.name),
-      e(Text, { style: styles.footerZeile }, FIRMA.strasse),
-      e(Text, { style: styles.footerZeile }, `${FIRMA.ort}, ${FIRMA.land}`),
-    ),
-    e(
-      View,
-      { style: styles.footerSpalte },
-      e(Text, { style: styles.footerZeile }, `Telefon: ${FIRMA.telefon}`),
-      e(Text, { style: styles.footerZeile }, FIRMA.web),
-      e(Text, { style: styles.footerZeile }, FIRMA.email),
-    ),
-    e(
-      View,
-      { style: styles.footerSpalte },
-      e(Text, { style: styles.footerZeile }, "Geschäftsführung:"),
-      e(Text, { style: styles.footerZeile }, "Beckhoff Automation GmbH"),
-      e(Text, { style: styles.footerZeile }, FIRMA.gericht),
-    ),
-    e(
-      View,
-      { style: styles.footerSpalteLetzte },
-      e(Text, { style: styles.footerZeile }, `USt-IdNr. ${FIRMA.uid}`),
-      e(Text, { style: styles.footerZeile }, FIRMA.firmenbuch),
-    ),
-  );
-}
-
-/**
- * RechnungDocument
- * ----------------
- * @param {object} props
- * @param {object} props.rechnung - Rechnungen-Datensatz (rechnungs_nummer, rechnungs_datum)
- * @param {object} props.buchung - zugehörige Buchung inkl. Gaeste/Objekte/ObjekteZusatz/Preisanpassungen
- * @returns {React.ReactElement}
- */
-export function RechnungDocument({ rechnung, buchung }) {
-  const gast = buchung.Gaeste;
-  const objekt = buchung.Objekte;
-  const zusatzobjekt = buchung.ObjekteZusatz;
-  const preisanpassungen = buchung.Preisanpassungen || [];
-
-  const stundenbasiert = istStundenbasiert(objekt?.name);
-  const zeitraumText = stundenbasiert
-    ? `${buchung.anreise} (${buchung.anreise_zeit || "-"} Uhr)\n${buchung.abreise} (${buchung.abreise_zeit || "-"} Uhr)`
-    : `${buchung.anreise}\n${buchung.abreise}`;
-
-  const posName = zusatzobjekt ? `${objekt?.name} inkl. ${zusatzobjekt.name}` : objekt?.name;
-  const grundlage = berechnungsgrundlage(buchung, objekt, stundenbasiert);
-
-  return e(
+  return h(
     Document,
-    null,
-    e(
+    { title: `Rechnung_${rNr}` },
+    h(
       Page,
-      { size: "A4", style: styles.page },
+      { size: 'A4', style: styles.page },
 
-      Kopfbereich(),
-
-      // ─── EMPFÄNGER LINKS / TITEL + META RECHTS ───
-      e(
+      // 1. HEADER
+      h(
         View,
-        { style: styles.obererBereich },
-        e(
+        { style: styles.headerRow },
+        finalLogo
+          ? h(Image, { src: finalLogo, style: styles.logo })
+          : h(Text, { style: styles.brandTextFallback }, 'BECKHOFF'),
+        h(
           View,
-          { style: styles.empfaengerSpalte },
-          e(Text, { style: styles.empfaengerName }, gast?.name),
-          e(Text, { style: styles.empfaengerZeile }, `${gast?.strasse} ${gast?.hnr}`),
-          e(Text, { style: styles.empfaengerZeile }, `${gast?.plz} ${gast?.stadt}`),
-          e(Text, { style: styles.empfaengerZeile }, gast?.land),
-        ),
-        e(
-          View,
-          { style: styles.metaSpalte },
-          e(Text, { style: styles.dokumentTitel }, "Rechnung"),
-          e(
-            View,
-            { style: styles.metaZeile },
-            e(Text, { style: styles.metaLabel }, "Rechnungsnummer"),
-            e(Text, { style: styles.metaWert }, rechnung.rechnungs_nummer),
-          ),
-          e(
-            View,
-            { style: styles.metaZeile },
-            e(Text, { style: styles.metaLabel }, "Rechnungsdatum"),
-            e(Text, { style: styles.metaWert }, rechnung.rechnungs_datum),
-          ),
-        ),
+          { style: styles.companyHeaderRight },
+          h(Text, { style: styles.companyNameHeader }, unternehmensDaten.name),
+          h(Text, { style: styles.companySubHeader }, `${unternehmensDaten.strasse} • ${unternehmensDaten.plzOrt}`)
+        )
       ),
 
-      e(View, { style: styles.trennlinieRot }),
-
-      // ─── "IHRE DATEN" / "RECHNUNGSDATEN" ZWEISPALTEN-BLOCK ───
-      e(
+      // 2. BRIEFFENSTER & META
+      h(
         View,
-        { style: styles.datenBereich },
-        e(
+        { style: styles.letterHeadRow },
+        h(
           View,
-          { style: styles.datenSpalte },
-          e(Text, { style: styles.abschnittTitel }, "Ihre Daten"),
-          e(
-            View,
-            { style: styles.datenZeile },
-            e(Text, { style: styles.datenLabel }, "Gast"),
-            e(Text, { style: styles.datenWert }, gast?.name),
-          ),
-          e(
-            View,
-            { style: styles.datenZeile },
-            e(Text, { style: styles.datenLabel }, "E-Mail"),
-            e(Text, { style: styles.datenWert }, gast?.email),
-          ),
+          { style: styles.addressCol },
+          currentGast?.firma ? h(Text, { style: [styles.recipientLine, { fontFamily: 'Helvetica-Bold' }] }, currentGast.firma) : null,
+          h(Text, { style: styles.recipientName }, `${currentGast?.anrede ? `${currentGast.anrede} ` : ''}${gastName}`),
+          h(Text, { style: styles.recipientLine }, gastAdresse),
+          h(Text, { style: styles.recipientLine }, gastOrt),
+          currentGast?.land && currentGast.land !== 'Österreich' ? h(Text, { style: styles.recipientLine }, currentGast.land) : null
         ),
-        e(
+        h(
           View,
-          { style: styles.datenSpalte },
-          e(Text, { style: styles.abschnittTitel }, "Rechnungsdaten"),
-          e(
+          { style: styles.metaCol },
+          h(
             View,
-            { style: styles.datenZeile },
-            e(Text, { style: styles.datenLabel }, "Buchungsnummer"),
-            e(Text, { style: styles.datenWert }, `#${buchung.id}`),
+            { style: styles.metaRow },
+            h(Text, { style: styles.metaLabel }, 'Rechnungsdatum:'),
+            h(Text, { style: styles.metaValue }, formatDate(rDatum))
           ),
-          e(
+          h(
             View,
-            { style: styles.datenZeile },
-            e(Text, { style: styles.datenLabel }, "Zahlungsziel"),
-            e(Text, { style: styles.datenWert }, "Sofort fällig"),
+            { style: styles.metaRow },
+            h(Text, { style: styles.metaLabel }, 'Fälligkeitsdatum:'),
+            h(Text, { style: styles.metaValue }, calcFaelligkeit())
           ),
-        ),
+          h(
+            View,
+            { style: styles.metaRow },
+            h(Text, { style: styles.metaLabel }, 'Rechnungs-Nr.:'),
+            h(Text, { style: [styles.metaValue, { color: COLORS.primary }] }, rNr)
+          ),
+          h(
+            View,
+            { style: styles.metaRowLast },
+            h(Text, { style: styles.metaLabel }, 'Buchungs-ID:'),
+            h(Text, { style: styles.metaValue }, `#${currentBuchung?.id || '-'}`)
+          )
+        )
       ),
 
-      // ─── POSITIONSKOPF ───
-      e(
-        View,
-        { style: styles.posKopfRow },
-        e(Text, { style: [styles.colPos, styles.posKopfText] }, "Pos."),
-        e(Text, { style: [styles.colBezeichnung, styles.posKopfText] }, "Bezeichnung"),
-        e(Text, { style: [styles.colZeitraum, styles.posKopfText] }, "Zeitraum"),
-        e(Text, { style: [styles.colBetrag, styles.posKopfText] }, "Betrag"),
-      ),
-
-      // ─── POSITIONSBLOCK (fett + graue Detailzeilen, wie im Lieferschein) ───
-      e(
-        View,
-        { style: styles.posBlock },
-        e(Text, { style: [styles.colPos, styles.posNummer] }, "100"),
-        e(
-          View,
-          { style: styles.colBezeichnung },
-          e(Text, { style: styles.posName }, posName),
-          objekt?.beschreibung && e(Text, { style: styles.posDetailZeile }, objekt.beschreibung),
-          grundlage && e(Text, { style: styles.posDetailZeile }, grundlage),
-          zusatzobjekt &&
-            e(
-              Text,
-              { style: styles.posDetailZeile },
-              `inkl. Zusatzobjekt: ${zusatzobjekt.name}${zusatzobjekt.beschreibung ? " – " + zusatzobjekt.beschreibung : ""}`,
-            ),
-        ),
-        e(Text, { style: [styles.colZeitraum, styles.posZeitraumText] }, zeitraumText),
-        e(Text, { style: [styles.colBetrag, styles.posBetragText] }, formatEuro(buchung.preis)),
-      ),
-
-      // ─── SUMMENBLOCK ───
-      e(
-        View,
-        { style: styles.summenBereich },
-        e(
-          View,
-          { style: styles.summenZeile },
-          e(Text, { style: styles.summenLabel }, "Gesamtbetrag"),
-          e(Text, { style: styles.summenWert }, formatEuro(buchung.preis)),
-        ),
-      ),
-
-      // ─── PREISANPASSUNGEN (nur falls welche existieren) ───
-      preisanpassungen.length > 0 &&
-        e(
-          View,
-          { style: styles.anpassungenBlock },
-          e(Text, { style: styles.anpassungenTitel }, "Nachträgliche Preisanpassungen"),
-          ...preisanpassungen.map((a) =>
-            e(
-              Text,
-              { key: a.id, style: styles.anpassungZeile },
-              `${formatZeitstempelKurz(a.erstellt_am)}:  ${formatEuro(a.alter_betrag)}  →  ${formatEuro(a.neuer_betrag)}   (${a.grund})`,
-            ),
-          ),
-        ),
-
-      e(
+      // 3. ANREDE
+      h(Text, { style: styles.docTitle }, `Rechnung ${rNr}`),
+      h(
         Text,
-        { style: styles.schlussText },
-        "Vielen Dank für Ihren Aufenthalt bei uns. Diese Rechnung wurde automatisch erstellt und ist ohne Unterschrift gültig.",
+        { style: styles.introText },
+        `Sehr geehrte(r) ${currentGast?.anrede ? `${currentGast.anrede} ` : ''}${currentGast?.nachname || gastName},\n` +
+        'wir bedanken uns für Ihre Buchung und stellen Ihnen die vereinbarten Leistungen in Rechnung:'
       ),
-      e(Text, { style: styles.gruss }, "Mit freundlichen Grüßen\nBeckhoff Automation GmbH"),
 
-      Fusszeile(),
-    ),
+      // 4. TABELLE
+      h(
+        View,
+        { style: styles.table },
+        h(
+          View,
+          { style: styles.tableHeader },
+          h(Text, { style: [styles.th, styles.colPos] }, 'Pos.'),
+          h(Text, { style: [styles.th, styles.colDesc] }, 'Bezeichnung / Zeitraum'),
+          h(Text, { style: [styles.th, styles.colQty] }, 'Einheit'),
+          h(Text, { style: [styles.th, styles.colPrice] }, 'Einzelpreis'),
+          h(Text, { style: [styles.th, styles.colTotal] }, 'Gesamtpreis')
+        ),
+        h(
+          View,
+          { style: styles.tableRow },
+          h(Text, { style: styles.colPos }, '1'),
+          h(
+            View,
+            { style: styles.colDesc },
+            h(Text, { style: styles.itemTitle }, currentObjekt?.name || 'Aufenthalt'),
+            h(
+              Text,
+              { style: styles.itemSubtitle },
+              `Zeitraum: ${formatDate(currentBuchung?.anreise)} bis ${formatDate(currentBuchung?.abreise)}`
+            )
+          ),
+          h(Text, { style: styles.colQty }, isWohnung ? 'Pauschal' : 'Std.'),
+          h(Text, { style: styles.colPrice }, formatCurrency(gesamtpreis)),
+          h(Text, { style: styles.colTotal }, formatCurrency(gesamtpreis))
+        ),
+        currentBuchung?.ObjekteZusatz
+          ? h(
+              View,
+              { style: styles.tableRow },
+              h(Text, { style: styles.colPos }, '2'),
+              h(
+                View,
+                { style: styles.colDesc },
+                h(Text, { style: styles.itemTitle }, `Zusatzleistung: ${currentBuchung.ObjekteZusatz.name}`),
+                h(Text, { style: styles.itemSubtitle }, 'Nutzung im selben Zeitraum (Kombibuchung)')
+              ),
+              h(Text, { style: styles.colQty }, '1 Pausch.'),
+              h(Text, { style: styles.colPrice }, 'Inklusive'),
+              h(Text, { style: styles.colTotal }, 'Inklusive')
+            )
+          : null
+      ),
+
+      // 5. SUMMEN
+      h(
+        View,
+        { style: styles.totalsSection, wrap: false },
+        h(
+          View,
+          { style: styles.totalsTable },
+          h(
+            View,
+            { style: styles.totalsRow },
+            h(Text, { style: styles.totalsLabel }, 'Zwischensumme:'),
+            h(Text, { style: styles.totalsValue }, formatCurrency(gesamtpreis))
+          ),
+          h(
+            View,
+            { style: styles.grandTotalRow },
+            h(Text, { style: styles.grandTotalLabel }, 'Gesamtbetrag:'),
+            h(Text, { style: styles.grandTotalValue }, formatCurrency(gesamtpreis))
+          )
+        )
+      ),
+
+      // 6. ZAHLUNGSTEXT
+      h(
+        View,
+        { style: styles.paymentTerms, wrap: false },
+        h(
+          Text,
+          { style: styles.paymentText },
+          `Bitte überweisen Sie den Rechnungsbetrag von ${formatCurrency(gesamtpreis)} bis zum ${calcFaelligkeit()} ` +
+          `unter Angabe der Rechnungsnummer ${rNr} auf unser unten angegebenes Bankkonto.`
+        )
+      ),
+
+      // 7. FOOTER
+      h(
+        View,
+        { style: styles.footer },
+        h(
+          View,
+          { style: styles.footerCol },
+          h(Text, { style: styles.footerHeading }, unternehmensDaten.name),
+          h(Text, { style: styles.footerText }, unternehmensDaten.strasse),
+          h(Text, { style: styles.footerText }, `${unternehmensDaten.plzOrt}, ${unternehmensDaten.land}`)
+        ),
+        h(
+          View,
+          { style: styles.footerCol },
+          h(Text, { style: styles.footerHeading }, 'Bankverbindung'),
+          h(Text, { style: styles.footerText }, `Institut: ${unternehmensDaten.bank}`),
+          h(Text, { style: styles.footerText }, `IBAN: ${unternehmensDaten.iban}`),
+          h(Text, { style: styles.footerText }, `BIC: ${unternehmensDaten.bic}`)
+        ),
+        h(
+          View,
+          { style: [styles.footerCol, { paddingRight: 0 }] },
+          h(Text, { style: styles.footerHeading }, 'Firmendaten'),
+          h(Text, { style: styles.footerText }, `E-Mail: ${unternehmensDaten.email}`),
+          h(Text, { style: styles.footerText }, unternehmensDaten.firmenbuch),
+          h(Text, { style: styles.footerText }, `UID: ${unternehmensDaten.uid}`)
+        )
+      )
+    )
   );
 }
+
+export default RechnungDocument;
