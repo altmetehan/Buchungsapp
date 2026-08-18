@@ -136,6 +136,9 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
 
   const istVergangen = reservation?.status === "vergangen";
 
+  // Stornieren darf NUR bei einer noch bevorstehenden Buchung passieren
+  const kannStornieren = reservation?.status === "bevorstehend";
+
   const [editForm, setEditForm] = useState({
     anreise: "",
     abreise: "",
@@ -462,6 +465,16 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
 
   /** Löscht die Buchung endgültig per DELETE-Request beim Backend. */
   const handleConfirmDelete = async () => {
+    // Zusätzliche Absicherung direkt hier (nicht nur über den
+    // deaktivierten Button) - falls "showConfirm" aus irgendeinem
+    // Grund doch für eine nicht-bevorstehende Buchung geöffnet würde,
+    // wird das Stornieren trotzdem verweigert.
+    if (!kannStornieren) {
+      showToast("error", "Nur bevorstehende Buchungen können storniert werden.");
+      setShowConfirm(false);
+      return;
+    }
+
     setIsDeleting(true);
     try {
       const response = await fetch(`${BUCHUNGEN_API}/${reservation.id}`, { method: "DELETE" });
@@ -532,7 +545,7 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
               className="btn-primary"
               style={{ padding: "10px 20px", fontSize: "14px" }}
               onClick={handleConfirmDelete}
-              disabled={isDeleting}
+              disabled={isDeleting || !kannStornieren}
             >
               {isDeleting ? "Storniert..." : "Ja, stornieren."}
             </button>
@@ -744,7 +757,19 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
           </div>
 
           <div className="modal-footer-flex">
-            <button type="button" className="btn-delete-modal" style={{ padding: "14px 24px", fontSize: "14px" }} disabled={isDeleting} onClick={() => setShowConfirm(true)}>
+            <button
+              type="button"
+              className="btn-delete-modal"
+              style={{
+                padding: "14px 24px",
+                fontSize: "14px",
+                opacity: kannStornieren ? 1 : 0.5,
+                cursor: kannStornieren ? "pointer" : "not-allowed",
+              }}
+              disabled={isDeleting || !kannStornieren}
+              onClick={() => setShowConfirm(true)}
+              title={!kannStornieren ? "Nur bevorstehende Buchungen können storniert werden." : undefined}
+            >
               Buchung stornieren
             </button>
 

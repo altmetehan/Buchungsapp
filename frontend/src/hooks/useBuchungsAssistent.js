@@ -24,6 +24,9 @@ const BUCHUNGEN_API = "/api/buchungen";
 const GAESTE_API = "/api/gaeste";
 const RECHNUNGEN_API = "/api/rechnungen";
 
+const STANDARD_ANREISE_ZEIT = "09:00";
+const STANDARD_ABREISE_ZEIT = "17:00";
+
 const berechneStunden = (startDatum, startZeit, endDatum, endZeit) => {
   if (!startDatum || !endDatum || !startZeit || !endZeit) return 0;
   const [sh, sm] = startZeit.split(":").map(Number);
@@ -134,7 +137,7 @@ export function useBuchungsAssistent() {
     setIsGuestSuggestOpen(false);
   };
 
-  const [zeiten, setZeiten] = useState({ anreiseZeit: "09:00", abreiseZeit: "17:00" });
+  const [zeiten, setZeiten] = useState({ anreiseZeit: STANDARD_ANREISE_ZEIT, abreiseZeit: STANDARD_ABREISE_ZEIT });
 
   const [bookingDetails, setBookingDetails] = useState({
     zusatzobjektMieten: "Nein",
@@ -354,7 +357,13 @@ export function useBuchungsAssistent() {
 
     let zusatzAufpreis = 0;
     if (bookingDetails.zusatzobjektMieten === "Ja" && zugewiesenesZusatzobjekt) {
-      const zusatzStunden = berechneStunden(dateRange.start, "15:00", dateRange.end, "11:00");
+      // der tatsächlich gebuchten Dauer ab.
+      const zusatzStunden = berechneStunden(
+        dateRange.start,
+        einstellungen.checkin_zeit,
+        dateRange.end,
+        einstellungen.checkout_zeit
+      );
       const zusatzPreisRegulaer = zusatzStunden * zugewiesenesZusatzobjekt.preisProNacht;
       zusatzAufpreis = zusatzPreisRegulaer * (1 - ZUSATZOBJEKT_KOMBI_RABATT_PROZENT / 100);
     }
@@ -368,6 +377,9 @@ export function useBuchungsAssistent() {
     stundenHauptobjekt,
     bookingDetails.zusatzobjektMieten,
     zugewiesenesZusatzobjekt,
+    ZUSATZOBJEKT_KOMBI_RABATT_PROZENT,
+    einstellungen.checkin_zeit,
+    einstellungen.checkout_zeit,
   ]);
 
   // ─── HANDLER FÜR RABATT & ENDPREIS ───
@@ -480,7 +492,13 @@ export function useBuchungsAssistent() {
               (b) => b.resource?.toLowerCase() === obj.name?.toLowerCase() && b.start <= endISO && b.end >= startISO
             );
 
-            const verfuegbarFuerUhrzeit = istVerfuegbar(obj.name, startISO, endISO, zeiten.anreiseZeit, zeiten.abreiseZeit);
+            const verfuegbarFuerUhrzeit = istVerfuegbar(
+              obj.name,
+              startISO,
+              endISO,
+              STANDARD_ANREISE_ZEIT,
+              STANDARD_ABREISE_ZEIT
+            );
             const durchgehendBelegt = tagesBelegungen.some(
               (b) => (b.anreiseZeit === "00:00" && b.abreiseZeit === "23:59") || !b.anreiseZeit || (b.start < startISO && b.end > endISO)
             );
@@ -520,8 +538,6 @@ export function useBuchungsAssistent() {
     endISO,
     dateRange.start,
     dateRange.end,
-    zeiten.anreiseZeit,
-    zeiten.abreiseZeit,
     istVerfuegbar,
     MINDEST_NAECHTE_WOHNUNG,
   ]);
@@ -541,12 +557,22 @@ export function useBuchungsAssistent() {
     setSelectedObjekt(obj);
 
     if (istStundenbasiert(obj.name) && dateRange.start && dateRange.end) {
-      const istStandardFrei = istVerfuegbar(obj.name, startISO, endISO, zeiten.anreiseZeit, zeiten.abreiseZeit);
+      const istStandardFrei = istVerfuegbar(
+        obj.name,
+        startISO,
+        endISO,
+        STANDARD_ANREISE_ZEIT,
+        STANDARD_ABREISE_ZEIT
+      );
 
-      if (!istStandardFrei) {
+      if (istStandardFrei) {
+        setZeiten({ anreiseZeit: STANDARD_ANREISE_ZEIT, abreiseZeit: STANDARD_ABREISE_ZEIT });
+      } else {
         const tagesBelegungen = bestehendeBuchungen.filter(
           (b) => b.resource?.toLowerCase() === obj.name?.toLowerCase() && b.start <= endISO && b.end >= startISO
         );
+
+        let neueZeitGefunden = false;
 
         if (tagesBelegungen.length > 0) {
           const sortiert = [...tagesBelegungen].sort((a, b) =>
@@ -561,8 +587,13 @@ export function useBuchungsAssistent() {
 
             if (istVerfuegbar(obj.name, startISO, endISO, naechsteFreieZeit, endZeitStr)) {
               setZeiten({ anreiseZeit: naechsteFreieZeit, abreiseZeit: endZeitStr });
+              neueZeitGefunden = true;
             }
           }
+        }
+
+        if (!neueZeitGefunden) {
+          setZeiten({ anreiseZeit: STANDARD_ANREISE_ZEIT, abreiseZeit: STANDARD_ABREISE_ZEIT });
         }
       }
     }
@@ -638,9 +669,10 @@ export function useBuchungsAssistent() {
         buchungPayload.anreise_zeit = zeiten.anreiseZeit;
         buchungPayload.abreise_zeit = zeiten.abreiseZeit;
       } else {
-        // Wohnungen bekommen immer die zentralen Check-in/-out-Zeiten aus den Einstellungen.
-        buchungPayload.anreise_zeit = "15:00";
-        buchungPayload.abreise_zeit = "11:00";
+        // Wohnungen bekommen immer die zentralen Check-in/-out-Zeiten
+        // aus den Einstellungen
+        buchungPayload.anreise_zeit = einstellungen.checkin_zeit;
+        buchungPayload.abreise_zeit = einstellungen.checkout_zeit;
       }
 
       const buchungRes = await fetch(BUCHUNGEN_API, {

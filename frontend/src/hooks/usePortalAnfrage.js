@@ -17,6 +17,14 @@ const OBJEKTE_API = "/api/objekte";
 const OEFFENTLICHE_BUCHUNGEN_API = "/api/buchungen/oeffentlich";
 const ANFRAGEN_API = "/api/anfragen";
 
+// Standard-Zeitfenster für JEDE Verfügbarkeitsprüfung eines
+// stundenbasierten Objekts (Schritt 1-Liste UND Objektauswahl) - siehe
+// ausführlichen Kommentar dazu in useBuchungsAssistent.js. Bewusst NICHT
+// der "zeiten"-State, da der noch von einer vorherigen Objekt-/
+// Datumsauswahl eine andere Uhrzeit enthalten kann.
+const STANDARD_ANREISE_ZEIT = "09:00";
+const STANDARD_ABREISE_ZEIT = "17:00";
+
 const LEERES_GASTFORMULAR = {
   name: "", email: "", telnr: "", strasse: "", hausnummer: "", plz: "", stadt: "", land: "Österreich",
 };
@@ -62,7 +70,7 @@ export function usePortalAnfrage() {
 
   const [selectedObjekt, setSelectedObjekt] = useState(null);
 
-  const [zeiten, setZeiten] = useState({ anreiseZeit: "09:00", abreiseZeit: "17:00" });
+  const [zeiten, setZeiten] = useState({ anreiseZeit: STANDARD_ANREISE_ZEIT, abreiseZeit: STANDARD_ABREISE_ZEIT });
 
   const [bookingDetails, setBookingDetails] = useState({
     zusatzobjektMieten: "Nein",
@@ -300,7 +308,17 @@ export function usePortalAnfrage() {
             (b) => (b.name || b.resource)?.toLowerCase() === obj.name?.toLowerCase() && b.start <= endISO && b.end >= startISO
           );
 
-          const verfuegbarFuerUhrzeit = istVerfuegbar(obj.name, startISO, endISO, zeiten.anreiseZeit, zeiten.abreiseZeit);
+          // WICHTIG: fest mit der Standardzeit prüfen, nicht mit dem
+          // "zeiten"-State (siehe Kommentar am Kopf dieser Datei) -
+          // sonst kann eine von einer früheren Auswahl übrig gebliebene
+          // Uhrzeit einen tatsächlichen Konflikt verschleiern.
+          const verfuegbarFuerUhrzeit = istVerfuegbar(
+            obj.name,
+            startISO,
+            endISO,
+            STANDARD_ANREISE_ZEIT,
+            STANDARD_ABREISE_ZEIT
+          );
           // Objekt ist ganztägig belegt, wenn eine mehrtägige Buchung (z.B. Wohnungs-Zusatzbus) über diesen Tag geht
           const durchgehendBelegt = tagesBelegungen.some(
             (b) => (b.anreiseZeit === "00:00" && b.abreiseZeit === "23:59") || !b.anreiseZeit || (b.start < startISO && b.end > endISO)
@@ -344,8 +362,6 @@ export function usePortalAnfrage() {
     naechteAnz,
     istVerfuegbar,
     MINDEST_NAECHTE_WOHNUNG,
-    zeiten.anreiseZeit,
-    zeiten.abreiseZeit,
   ]);
 
   const unterschreitetMindestNaechte =
@@ -355,13 +371,27 @@ export function usePortalAnfrage() {
     setSelectedObjekt(obj);
 
     if (istStundenbasiert(obj.name) && dateRange.start && dateRange.end) {
-      const istStandardFrei = istVerfuegbar(obj.name, startISO, endISO, zeiten.anreiseZeit, zeiten.abreiseZeit);
+      // Siehe ausführlichen Kommentar in useBuchungsAssistent.js: immer
+      // von der festen Standardzeit ausgehen statt vom evtl. noch
+      // veralteten "zeiten"-State, und am Ende IMMER explizit setZeiten
+      // aufrufen (auch als expliziter Reset auf die Standardzeit, falls
+      // keine Alternativzeit gefunden wurde).
+      const istStandardFrei = istVerfuegbar(
+        obj.name,
+        startISO,
+        endISO,
+        STANDARD_ANREISE_ZEIT,
+        STANDARD_ABREISE_ZEIT
+      );
 
-      if (!istStandardFrei) {
-        // Standardzeit (09:00) ist belegt - nächste freie Uhrzeit an diesem Tag ermitteln.
+      if (istStandardFrei) {
+        setZeiten({ anreiseZeit: STANDARD_ANREISE_ZEIT, abreiseZeit: STANDARD_ABREISE_ZEIT });
+      } else {
         const tagesBelegungen = belegungen.filter(
           (b) => b.name?.toLowerCase() === obj.name?.toLowerCase() && b.start <= endISO && b.end >= startISO
         );
+
+        let neueZeitGefunden = false;
 
         if (tagesBelegungen.length > 0) {
           const sortiert = [...tagesBelegungen].sort((a, b) =>
@@ -376,8 +406,13 @@ export function usePortalAnfrage() {
 
             if (istVerfuegbar(obj.name, startISO, endISO, naechsteFreieZeit, endZeitStr)) {
               setZeiten({ anreiseZeit: naechsteFreieZeit, abreiseZeit: endZeitStr });
+              neueZeitGefunden = true;
             }
           }
+        }
+
+        if (!neueZeitGefunden) {
+          setZeiten({ anreiseZeit: STANDARD_ANREISE_ZEIT, abreiseZeit: STANDARD_ABREISE_ZEIT });
         }
       }
     }
@@ -524,7 +559,7 @@ export function usePortalAnfrage() {
     setSelectedObjekt(null);
     setGastData(LEERES_GASTFORMULAR);
     setGuestCounts({ erwachsene: 2, kinder: 0 });
-    setZeiten({ anreiseZeit: "09:00", abreiseZeit: "17:00" });
+    setZeiten({ anreiseZeit: STANDARD_ANREISE_ZEIT, abreiseZeit: STANDARD_ABREISE_ZEIT });
     setBookingDetails({ zusatzobjektMieten: "Nein", kennzeichen: "", info: "" });
     setNachricht("");
     setWurdeGesendet(false);
