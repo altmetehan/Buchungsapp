@@ -9,7 +9,11 @@ import {
   istStundenbasiert,
   istWohnung,
   istBus,
+  isSameDay,
   datumZeitUeberschneidenSich,
+  entsprichtWochentag,
+  getWochentagName,
+  berechneLiveVerfuegbarkeit,
 } from "../utils/javaUtils";
 import { useEinstellungen } from "./useEinstellungen";
 
@@ -54,6 +58,8 @@ export function usePortalAnfrage() {
   const { einstellungen } = useEinstellungen();
   const MINDEST_NAECHTE_WOHNUNG = einstellungen.mindest_naechte_wohnung;
   const ZUSATZOBJEKT_KOMBI_RABATT_PROZENT = einstellungen.kombirabatt ?? 0;
+  const CHECKIN_WOCHENTAG = einstellungen.checkin_wochentag;
+  const CHECKOUT_WOCHENTAG = einstellungen.checkout_wochentag;
 
   const [wizardStep, setWizardStep] = useState(1);
 
@@ -138,12 +144,39 @@ export function usePortalAnfrage() {
     const clicked = info.date;
     if (isPastDate(clicked)) return;
 
+    // Wenn bereits ein Objekt gewählt ist (im "Zeitraum ändern"-Modal in Schritt 2):
+    if (selectedObjekt) {
+      if (istStundenbasiert(selectedObjekt.name)) {
+        // Stundenbasiert -> gleicher Tag als Start und Ende
+        setDateRange({ start: clicked, end: clicked });
+        setHoveredDate(null);
+        return;
+      } else {
+        // Wohnung:
+        setDateRange((prev) => {
+          if (!prev.start || (prev.start && prev.end)) {
+            const nextDay = new Date(clicked);
+            nextDay.setDate(nextDay.getDate() + 1);
+            return { start: clicked, end: nextDay };
+          }
+          if (clicked <= prev.start) {
+            const nextDay = new Date(clicked);
+            nextDay.setDate(nextDay.getDate() + 1);
+            return { start: clicked, end: nextDay };
+          }
+          return { start: prev.start, end: clicked };
+        });
+        return;
+      }
+    }
+
+    // In Schritt 1 (vor Objektauswahl):
     setDateRange((prev) => {
       if (!prev.start || (prev.start && prev.end)) return { start: clicked, end: null };
       if (clicked < prev.start) return { start: clicked, end: prev.start };
       return { start: prev.start, end: clicked };
     });
-  }, []);
+  }, [selectedObjekt]);
 
   const handleClearSelection = () => {
     setDateRange({ start: null, end: null });
@@ -260,11 +293,19 @@ export function usePortalAnfrage() {
     einstellungen.checkout_zeit,
   ]);
 
+  // ─── WOCHENTAGS-PRÜFUNG ───
+  const checkinWochentagPasst = useMemo(() => {
+    return entsprichtWochentag(dateRange.start, CHECKIN_WOCHENTAG);
+  }, [dateRange.start, CHECKIN_WOCHENTAG]);
+
+  const checkoutWochentagPasst = useMemo(() => {
+    return entsprichtWochentag(dateRange.end, CHECKOUT_WOCHENTAG);
+  }, [dateRange.end, CHECKOUT_WOCHENTAG]);
+
   const verfuegbareObjekte = useMemo(() => {
     const hatStart = dateRange.start !== null;
     const hatEnd = dateRange.end !== null;
     const gueltigerZeitraum = hatStart && hatEnd;
-    const todayISO = toISO(new Date());
 
     return objektStammdaten.map((obj) => {
       const stundenbasiert = istStundenbasiert(obj.name);
@@ -274,35 +315,31 @@ export function usePortalAnfrage() {
       let info;
       let preis = null;
 
-      if (gueltigerZeitraum && wohnung && naechteAnz < MINDEST_NAECHTE_WOHNUNG) {
+      const checkinPasst = !gueltigerZeitraum || stundenbasiert || entsprichtWochentag(dateRange.start, CHECKIN_WOCHENTAG);
+      const checkoutPasst = !gueltigerZeitraum || stundenbasiert || entsprichtWochentag(dateRange.end, CHECKOUT_WOCHENTAG);
+
+      if (gueltigerZeitraum && wohnung && (!checkinPasst || !checkoutPasst)) {
+        status = "nicht verfügbar";
+        if (!checkinPasst && !checkoutPasst && CHECKIN_WOCHENTAG === CHECKOUT_WOCHENTAG) {
+          info = `Nur ${CHECKIN_WOCHENTAG} bis ${CHECKOUT_WOCHENTAG} anfragbar`;
+        } else if (!checkinPasst) {
+          info = `Anreise nur am ${CHECKIN_WOCHENTAG} möglich`;
+        } else {
+          info = `Abreise nur am ${CHECKOUT_WOCHENTAG} möglich`;
+        }
+        preis = null;
+      } else if (gueltigerZeitraum && wohnung && naechteAnz < MINDEST_NAECHTE_WOHNUNG) {
         status = "nicht verfügbar";
         info = `Mindestaufenthalt: ${MINDEST_NAECHTE_WOHNUNG} Nächte`;
         preis = null;
       } else if (!gueltigerZeitraum) {
-        const activeBooking = belegungen.find(
-          (b) =>
-            b.name?.toLowerCase() === obj.name?.toLowerCase() &&
-            b.start <= todayISO &&
-            b.end > todayISO
-        );
-
-        if (activeBooking) {
-          status = "belegt";
-          info = `Belegt bis ${formatDe(parseISO(activeBooking.end))}`;
-        } else {
-          const futureBookings = belegungen
-            .filter((b) => b.name?.toLowerCase() === obj.name?.toLowerCase() && b.start > todayISO)
-            .sort((a, b) => a.start.localeCompare(b.start));
-
-          status = "frei";
-          info =
-            futureBookings.length > 0
-              ? `Frei bis ${formatDe(parseISO(futureBookings[0].start))}`
-              : "Durchgehend frei";
-        }
+        // ZENTRALE LIVE-VERFÜGBARKEIT: berücksichtigt lückenlose Anschlussbuchungen und Tagesanreisen
+        const live = berechneLiveVerfuegbarkeit(obj.name, belegungen, einstellungen);
+        status = live.status;
+        info = live.info;
         preis = null;
       } else {
-          if (stundenbasiert) {
+        if (stundenbasiert) {
           // b.name OR b.resource prüfen, damit Haupt- und Zusatzobjekte sicher gefunden werden
           const tagesBelegungen = belegungen.filter(
             (b) => (b.name || b.resource)?.toLowerCase() === obj.name?.toLowerCase() && b.start <= endISO && b.end >= startISO
@@ -362,6 +399,9 @@ export function usePortalAnfrage() {
     naechteAnz,
     istVerfuegbar,
     MINDEST_NAECHTE_WOHNUNG,
+    CHECKIN_WOCHENTAG,
+    CHECKOUT_WOCHENTAG,
+    einstellungen,
   ]);
 
   const unterschreitetMindestNaechte =
@@ -370,7 +410,30 @@ export function usePortalAnfrage() {
   const handleSelectObjekt = (obj) => {
     setSelectedObjekt(obj);
 
-    if (istStundenbasiert(obj.name) && dateRange.start && dateRange.end) {
+    let start = dateRange.start;
+    let end = dateRange.end;
+
+    // Automatische Datumslogik je nach Typ
+    if (start) {
+      if (istStundenbasiert(obj.name)) {
+        // Stundenbasiert -> Rückgabedatum ist automatisch Anreisedatum (gleicher Tag)
+        end = start;
+        setDateRange({ start, end: start });
+      } else {
+        // Wohnung -> Abreisedatum ist mindestens Folgetag
+        if (!end || isSameDay(start, end)) {
+          const folgetag = new Date(start);
+          folgetag.setDate(folgetag.getDate() + 1);
+          end = folgetag;
+          setDateRange({ start, end: folgetag });
+        }
+      }
+    }
+
+    const sISO = toISO(start);
+    const eISO = toISO(end);
+
+    if (istStundenbasiert(obj.name) && start && end) {
       // Siehe ausführlichen Kommentar in useBuchungsAssistent.js: immer
       // von der festen Standardzeit ausgehen statt vom evtl. noch
       // veralteten "zeiten"-State, und am Ende IMMER explizit setZeiten
@@ -378,8 +441,8 @@ export function usePortalAnfrage() {
       // keine Alternativzeit gefunden wurde).
       const istStandardFrei = istVerfuegbar(
         obj.name,
-        startISO,
-        endISO,
+        sISO,
+        eISO,
         STANDARD_ANREISE_ZEIT,
         STANDARD_ABREISE_ZEIT
       );
@@ -388,7 +451,7 @@ export function usePortalAnfrage() {
         setZeiten({ anreiseZeit: STANDARD_ANREISE_ZEIT, abreiseZeit: STANDARD_ABREISE_ZEIT });
       } else {
         const tagesBelegungen = belegungen.filter(
-          (b) => b.name?.toLowerCase() === obj.name?.toLowerCase() && b.start <= endISO && b.end >= startISO
+          (b) => b.name?.toLowerCase() === obj.name?.toLowerCase() && b.start <= eISO && b.end >= sISO
         );
 
         let neueZeitGefunden = false;
@@ -404,7 +467,7 @@ export function usePortalAnfrage() {
             const endH = Math.min(23, h + 4);
             const endZeitStr = `${String(endH).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 
-            if (istVerfuegbar(obj.name, startISO, endISO, naechsteFreieZeit, endZeitStr)) {
+            if (istVerfuegbar(obj.name, sISO, eISO, naechsteFreieZeit, endZeitStr)) {
               setZeiten({ anreiseZeit: naechsteFreieZeit, abreiseZeit: endZeitStr });
               neueZeitGefunden = true;
             }
@@ -491,6 +554,8 @@ export function usePortalAnfrage() {
     !selectedObjekt ||
     !dateRange.start ||
     !dateRange.end ||
+    (istHauptobjektWohnung && !checkinWochentagPasst) ||
+    (istHauptobjektWohnung && !checkoutWochentagPasst) ||
     unterschreitetMindestNaechte ||
     !selectedObjektVerfuegbar ||
     (istHauptobjektStundenbasiert && stundenHauptobjekt <= 0) ||
@@ -584,6 +649,12 @@ export function usePortalAnfrage() {
     toast, dismissToast,
     MINDEST_NAECHTE_WOHNUNG,
     unterschreitetMindestNaechte,
+    CHECKIN_WOCHENTAG,
+    CHECKOUT_WOCHENTAG,
+    checkinWochentagPasst,
+    checkoutWochentagPasst,
+    startWochentag: getWochentagName(dateRange.start),
+    endWochentag: getWochentagName(dateRange.end),
     ZUSATZOBJEKT_KOMBI_RABATT_PROZENT
   };
 }

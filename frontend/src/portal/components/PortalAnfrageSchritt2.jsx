@@ -2,6 +2,7 @@ import { BuchungsZusammenfassung } from "../../components/booking/BuchungsZusamm
 import { CountryDropdown } from "../../components/ui/CountryDropdown";
 import { TimeDropdown } from "../../components/ui/TimeDropdown";
 import { useEinstellungen } from "../../hooks/useEinstellungen";
+import { istWohnung } from "../../utils/javaUtils";
 import "../../styles/shared-ui.css";
 import "../../styles/pageStyles/AnfrageErstellen.css";
 
@@ -46,6 +47,28 @@ export function PortalAnfrageSchritt2({ vm }) {
         stundenAnz={vm.istHauptobjektStundenbasiert ? vm.stundenHauptobjekt : null}
       />
 
+      {/* WARNUNG BEI NICHT EINHALTUNG DER WOCHENTAGS-REGELN FÜR WOHNUNGEN */}
+      {istWohnung(vm.selectedObjekt?.name) && (!vm.checkinWochentagPasst || !vm.checkoutWochentagPasst) && (
+        <div
+          style={{
+            color: "#ef4444",
+            fontSize: "14px",
+            fontWeight: "600",
+            textAlign: "right",
+            marginTop: "16px",
+            marginBottom: "16px",
+            width: "100%",
+          }}
+        >
+          ⚠ {!vm.checkinWochentagPasst && !vm.checkoutWochentagPasst && vm.CHECKIN_WOCHENTAG === vm.CHECKOUT_WOCHENTAG
+            ? `Wohnungsanfragen sind nur von ${vm.CHECKIN_WOCHENTAG} bis ${vm.CHECKOUT_WOCHENTAG} möglich.`
+            : !vm.checkinWochentagPasst
+            ? `Anreise für Wohnungen ist nur am ${vm.CHECKIN_WOCHENTAG} möglich (gewählt: ${vm.startWochentag}).`
+            : `Abreise für Wohnungen ist nur am ${vm.CHECKOUT_WOCHENTAG} möglich (gewählt: ${vm.endWochentag}).`}
+        </div>
+      )}
+
+      {/* WARNUNG BEI MINDESTAUFENTHALT */}
       {vm.unterschreitetMindestNaechte && (
         <div
           style={{
@@ -190,7 +213,7 @@ export function PortalAnfrageSchritt2({ vm }) {
                     }}
                   >
                     {vm.zusatzobjektVerfuegbar
-                      ? "✓ Bus ist im gewählten Zeitraum verfügbar (inkl. Kombi-Rabatt)."
+                      ? `✓ Bus ist im gewählten Zeitraum verfügbar ${vm.ZUSATZOBJEKT_KOMBI_RABATT_PROZENT > 0 ? `(inkl. Kombi-Rabatt)` : ``}.`
                       : "✕ Kein Bus in diesem Zeitraum verfügbar."}
                   </p>
                 </div>

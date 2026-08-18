@@ -218,11 +218,10 @@ router.post("/", async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 });
-
 // PUT /api/anfragen/:id/annehmen
 // 1. Verfügbarkeit im gewünschten Zeitraum ERNEUT prüfen.
 // 2. Anfragen-Gast (AnfrageGaeste) in die finale Gaeste-Tabelle übertragen/aktualisieren.
-// 3. Buchung + Rechnung automatisch anlegen.
+// 3. Buchung + Rechnung automatisch anlegen (Gast-Nachricht erhält Prefix "Nachricht vom Gast: ").
 // 4. Anfrage-Status auf "angenommen" setzen.
 router.put("/:id/annehmen", async (req, res) => {
   try {
@@ -318,6 +317,11 @@ router.put("/:id/annehmen", async (req, res) => {
 
     const rechnungsNummer = await generiereNaechsteRechnungsnummer();
 
+    // Nachricht vom Gast wird mit klarem Präfix für die Buchung formatiert
+    const buchungInfos = anfrage.infos && anfrage.infos.trim()
+      ? `Nachricht vom Gast: ${anfrage.infos.trim()}`
+      : null;
+
     // Buchung, Rechnung und Anfrage-Update laufen in einer Transaktion.
     const { neueBuchung, aktualisierteAnfrage, neueRechnung } = await prisma.$transaction(async (tx) => {
       const buchung = await tx.buchungen.create({
@@ -332,7 +336,7 @@ router.put("/:id/annehmen", async (req, res) => {
           preis: finalerPreis,
           erwachsene: anfrage.erwachsene,
           kinder: anfrage.kinder,
-          infos: anfrage.infos,
+          infos: buchungInfos,
         },
         include: { Gaeste: true, Objekte: true, ObjekteZusatz: true },
       });

@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { BuchungsZusammenfassung } from "./BuchungsZusammenfassung";
-import { formatDe } from "../../utils/javaUtils";
+import { formatDe, istWohnung } from "../../utils/javaUtils";
 import "../../styles/shared-ui.css";
 import { TimeDropdown } from "../ui/TimeDropdown";
 import { useEinstellungen } from "../../hooks/useEinstellungen";
@@ -229,6 +229,27 @@ export function BuchenSchritt3({ vm }) {
           </div>
         </div>
 
+        {/* WARNUNG BEI NICHT EINHALTUNG DER WOCHENTAGS-REGELN FÜR WOHNUNGEN */}
+        {istWohnung(vm.selectedObjekt?.name) && (!vm.checkinWochentagPasst || !vm.checkoutWochentagPasst) && (
+          <div
+            style={{
+              color: "#ef4444",
+              fontSize: "14px",
+              fontWeight: "600",
+              textAlign: "right",
+              marginTop: "16px",
+              width: "100%",
+            }}
+          >
+            ⚠ {!vm.checkinWochentagPasst && !vm.checkoutWochentagPasst && vm.CHECKIN_WOCHENTAG === vm.CHECKOUT_WOCHENTAG
+              ? `Wohnungsbuchungen sind nur von ${vm.CHECKIN_WOCHENTAG} bis ${vm.CHECKOUT_WOCHENTAG} möglich.`
+              : !vm.checkinWochentagPasst
+              ? `Anreise für Wohnungen ist nur am ${vm.CHECKIN_WOCHENTAG} möglich (gewählt: ${vm.startWochentag}).`
+              : `Abreise für Wohnungen ist nur am ${vm.CHECKOUT_WOCHENTAG} möglich (gewählt: ${vm.endWochentag}).`}
+          </div>
+        )}
+
+        {/* WARNUNG BEI MINDESTAUFENTHALT */}
         {vm.naechteAnz < vm.MINDEST_NAECHTE_WOHNUNG && !vm.istHauptobjektStundenbasiert && (
           <div
             style={{

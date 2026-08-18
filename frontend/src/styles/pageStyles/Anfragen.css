@@ -64,7 +64,7 @@
 /* Spalten: ID | Name | Objekt | Zeitraum | Email | Nachricht | Aktionen */
 .grid-anfragen-offen {
     display: grid;
-    grid-template-columns: 50px 180px 170px 170px 200px 1fr 110px;
+    grid-template-columns: 50px 180px 170px 170px 200px 1fr 200px;
     align-items: center;
     gap: 10px;
 }

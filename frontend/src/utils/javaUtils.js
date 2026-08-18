@@ -11,8 +11,8 @@
  * Zwei Datumsformate tauchen in der App durchgängig auf:
  * - "deutsches Format": String "DD.MM.YYYY", z.B. "14.07.2026"
  * - "ISO-Format":       String "YYYY-MM-DD", z.B. "2026-07-14"
- *   (wird für Sortierung/Vergleiche genutzt, weil es sich alphabetisch
- *   korrekt sortieren lässt)
+ * (wird für Sortierung/Vergleiche genutzt, weil es sich alphabetisch
+ * korrekt sortieren lässt)
  */
 
 /**
@@ -360,3 +360,186 @@ export const getResourceColor = (name) => {
   }
   return AUTO_FARBPALETTE[hash % AUTO_FARBPALETTE.length];
 };
+
+// ─── WOCHENTAGS-HELFER (für zentrale Wohnungs-Restriktionen) ───
+
+export const WOCHENTAGE_NAMEN = [
+  "Sonntag",
+  "Montag",
+  "Dienstag",
+  "Mittwoch",
+  "Donnerstag",
+  "Freitag",
+  "Samstag",
+];
+
+/**
+ * Gibt den deutschen Wochentagsnamen eines Date-Objekts oder Datums-Strings zurück (z.B. "Freitag").
+ * @param {Date|string|null} date
+ * @returns {string}
+ */
+export const getWochentagName = (date) => {
+  if (!date) return "";
+  const d =
+    typeof date === "string"
+      ? date.includes("-")
+        ? parseISO(date)
+        : parseGermanDate(date)
+      : date;
+  if (!d || isNaN(d.getTime())) return "";
+  return WOCHENTAGE_NAMEN[d.getDay()];
+};
+
+/**
+ * Prüft, ob ein Datum dem geforderten Wochentag entspricht (z.B. "Freitag").
+ * Wenn kein Wochentag vorgegeben ist (leer/null), wird immer true zurückgegeben.
+ * @param {Date|string|null} date
+ * @param {string|null} requiredWochentag
+ * @returns {boolean}
+ */
+export const entsprichtWochentag = (date, requiredWochentag) => {
+  if (!requiredWochentag || requiredWochentag.trim() === "") return true;
+  if (!date) return true;
+  return getWochentagName(date).toLowerCase() === requiredWochentag.trim().toLowerCase();
+};
+
+/**
+ * Berechnet den aktuellen Live-Status ("frei" / "belegt") und Hinweistext
+ * für ein Objekt, wenn noch kein konkreter Zeitraum im Kalender gewählt ist.
+ * Berücksichtigt für Wohnungen nächteweise Belegung und lückenlose Anschlussbuchungen
+ * (z. B. Belegt bis 21.08. + Folge-Buchung ab 21.08. -> Belegt bis 28.08.).
+ *
+ * @param {string} objektName
+ * @param {Array} alleBelegungen - Array von { resource/name, start, end, anreiseZeit, abreiseZeit } (ISO-Strings)
+ * @param {object} [einstellungen] - { checkin_zeit, checkout_zeit }
+ * @returns {{ status: "frei" | "belegt", info: string }}
+ */
+export function berechneLiveVerfuegbarkeit(objektName, alleBelegungen = [], einstellungen = {}) {
+  if (!objektName) return { status: "frei", info: "Durchgehend frei" };
+
+  const stundenbasiert = istStundenbasiert(objektName);
+  const objNameLower = objektName.toLowerCase().trim();
+  const defaultCheckin = einstellungen?.checkin_zeit || "15:00";
+  const defaultCheckout = einstellungen?.checkout_zeit || "11:00";
+
+  // Relevante Belegungen für dieses Objekt filtern und chronologisch sortieren
+  const belegungen = alleBelegungen
+    .filter((b) => (b.resource || b.name)?.toLowerCase().trim() === objNameLower)
+    .map((b) => ({
+      start: b.start,
+      end: b.end,
+      anreiseZeit: b.anreiseZeit || (stundenbasiert ? "00:00" : defaultCheckin),
+      abreiseZeit: b.abreiseZeit || (stundenbasiert ? "23:59" : defaultCheckout),
+    }))
+    .sort((a, b) => {
+      const aKey = `${a.start}T${a.anreiseZeit}`;
+      const bKey = `${b.start}T${b.anreiseZeit}`;
+      return aKey.localeCompare(bKey);
+    });
+
+  if (belegungen.length === 0) {
+    return { status: "frei", info: "Durchgehend frei" };
+  }
+
+  const now = new Date();
+  const todayISO = toISO(now);
+  const nowHours = String(now.getHours()).padStart(2, "0");
+  const nowMins = String(now.getMinutes()).padStart(2, "0");
+  const nowTime = `${nowHours}:${nowMins}`;
+  const nowFull = `${todayISO}T${nowTime}`;
+
+  if (!stundenbasiert) {
+    // ── WOHNUNGEN (NÄCHTEWEISE) ──
+    // Eine Wohnung ist heute belegt, wenn:
+    // 1. Eine Buchung heute aktiv läuft (start < today && end > today)
+    // 2. Eine Buchung heute anreist (start === today) -> Nacht ist belegt
+    // 3. Eine Buchung heute abreist (end === today) und wir uns VOR der Check-out-Zeit befinden
+    const activeBooking = belegungen.find((b) => {
+      if (b.start < todayISO && b.end > todayISO) return true;
+      if (b.start === todayISO) return true;
+      if (b.end === todayISO && nowTime < b.abreiseZeit) return true;
+      return false;
+    });
+
+    if (activeBooking) {
+      // Anschlussbuchungen verketten (z.B. Abreise 21.08. + nächste Anreise 21.08.)
+      let chainEnd = activeBooking.end;
+      let chainEndZeit = activeBooking.abreiseZeit;
+
+      let expanded = true;
+      while (expanded) {
+        expanded = false;
+        for (const nextB of belegungen) {
+          if (nextB.start <= chainEnd && nextB.end > chainEnd) {
+            chainEnd = nextB.end;
+            chainEndZeit = nextB.abreiseZeit;
+            expanded = true;
+          }
+        }
+      }
+
+      return {
+        status: "belegt",
+        info: `Belegt bis ${formatDe(parseISO(chainEnd))}${chainEndZeit ? ` (${chainEndZeit} Uhr)` : ""}`,
+      };
+    }
+
+    // Wenn heute frei ist: nächste zukünftige Buchung suchen
+    const futureBooking = belegungen.find((b) => b.start > todayISO);
+    if (futureBooking) {
+      return {
+        status: "frei",
+        info: `Frei bis ${formatDe(parseISO(futureBooking.start))}${futureBooking.anreiseZeit ? ` (${futureBooking.anreiseZeit} Uhr)` : ""}`,
+      };
+    }
+
+    return { status: "frei", info: "Durchgehend frei" };
+  } else {
+    // ── STUNDENBASIERTE OBJEKTE (BUS, FORUM) ──
+    const activeBooking = belegungen.find((b) => {
+      const startFull = `${b.start}T${b.anreiseZeit}`;
+      const endFull = `${b.end}T${b.abreiseZeit}`;
+      return nowFull >= startFull && nowFull < endFull;
+    });
+
+    if (activeBooking) {
+      let chainEnd = activeBooking.end;
+      let chainEndZeit = activeBooking.abreiseZeit;
+      let chainEndFull = `${activeBooking.end}T${activeBooking.abreiseZeit}`;
+
+      let expanded = true;
+      while (expanded) {
+        expanded = false;
+        for (const nextB of belegungen) {
+          const nextStartFull = `${nextB.start}T${nextB.anreiseZeit}`;
+          const nextEndFull = `${nextB.end}T${nextB.abreiseZeit}`;
+          if (nextStartFull <= chainEndFull && nextEndFull > chainEndFull) {
+            chainEnd = nextB.end;
+            chainEndZeit = nextB.abreiseZeit;
+            chainEndFull = nextEndFull;
+            expanded = true;
+          }
+        }
+      }
+
+      return {
+        status: "belegt",
+        info: `Belegt bis ${formatDe(parseISO(chainEnd))}${chainEndZeit ? ` (${chainEndZeit} Uhr)` : ""}`,
+      };
+    }
+
+    const futureBooking = belegungen.find((b) => {
+      const startFull = `${b.start}T${b.anreiseZeit}`;
+      return startFull > nowFull;
+    });
+
+    if (futureBooking) {
+      return {
+        status: "frei",
+        info: `Frei bis ${formatDe(parseISO(futureBooking.start))}${futureBooking.anreiseZeit ? ` (${futureBooking.anreiseZeit} Uhr)` : ""}`,
+      };
+    }
+
+    return { status: "frei", info: "Durchgehend frei" };
+  }
+}

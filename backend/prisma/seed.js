@@ -14,7 +14,7 @@ async function main() {
   await prisma.objekte.deleteMany();
   await prisma.einstellungen.deleteMany();
 
-  // 2. Einstellungen erstellen
+// 2. Einstellungen erstellen
   await prisma.einstellungen.create({
     data: {
       id: 1,
@@ -22,6 +22,8 @@ async function main() {
       checkout_zeit: "11:00",
       mindest_naechte_wohnung: 2,
       kombirabatt: 20,
+      checkin_wochentag: "",
+      checkout_wochentag: "",
     },
   });
 

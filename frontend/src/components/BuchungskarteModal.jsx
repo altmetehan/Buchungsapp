@@ -246,7 +246,15 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
 
   /** Reagiert auf Änderungen an Datum/Uhrzeit: rechnet den Preis (unter Berücksichtigung des aktuellen Rabatts) neu. */
   const handleFieldChange = (field, value) => {
-    const updatedForm = { ...editForm, [field]: value };
+    let updatedForm = { ...editForm, [field]: value };
+
+    // ── AUTOMATISCHE ABREISE-/RÜCKGABEDATUM-LOGIK ──
+    if (field === "anreise" && value) {
+      if (stundenbasiert) {
+        // Bei stundenbasierten Objekten: Rückgabedatum ist automatisch derselbe Tag
+        updatedForm.abreise = value;
+      }
+    }
 
     if (["anreise", "abreise", "anreiseZeit", "abreiseZeit"].includes(field)) {
       const newBase = berechnePreis(

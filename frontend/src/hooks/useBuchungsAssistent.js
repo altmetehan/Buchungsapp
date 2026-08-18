@@ -15,6 +15,9 @@ import {
   istBus,
   datumZeitUeberschneidenSich,
   getNowIsoWithTime,
+  entsprichtWochentag,
+  getWochentagName,
+  berechneLiveVerfuegbarkeit,
 } from "../utils/javaUtils";
 import { useEinstellungen } from "./useEinstellungen";
 import { useToast } from "./useToast";
@@ -47,6 +50,8 @@ export function useBuchungsAssistent() {
   const { einstellungen } = useEinstellungen();
   const MINDEST_NAECHTE_WOHNUNG = einstellungen.mindest_naechte_wohnung;
   const ZUSATZOBJEKT_KOMBI_RABATT_PROZENT = einstellungen.kombirabatt;
+  const CHECKIN_WOCHENTAG = einstellungen.checkin_wochentag;
+  const CHECKOUT_WOCHENTAG = einstellungen.checkout_wochentag;
 
   const istNeueBuchungRoute = location.pathname.startsWith("/buchen/neu");
   const [wizardStep, setWizardStep] = useState(2);
@@ -74,6 +79,7 @@ export function useBuchungsAssistent() {
 
   const [selectedObjekt, setSelectedObjekt] = useState(null);
   const istHauptobjektStundenbasiert = istStundenbasiert(selectedObjekt?.name);
+  const istHauptobjektWohnung = istWohnung(selectedObjekt?.name);
 
   // ─── FORMULARDATEN ───
   const [guestData, setGuestData] = useState({
@@ -215,28 +221,28 @@ export function useBuchungsAssistent() {
     const stundenbasiert = istStundenbasiert(objektName);
 
     return !bestehendeBuchungen.some((b) => {
-        if (b.resource?.toLowerCase() !== objektName?.toLowerCase()) return false;
+      if (b.resource?.toLowerCase() !== objektName?.toLowerCase()) return false;
 
-        if (stundenbasiert) {
+      if (stundenbasiert) {
         // Wenn in Schritt 1 noch keine Uhrzeit gewählt wurde, prüfen wir 00:00 - 23:59 Uhr
         const sZeit = startZeit || "00:00";
         const eZeit = endZeit || "23:59";
 
         return datumZeitUeberschneidenSich(
-            startISO,
-            sZeit,
-            endISO,
-            eZeit,
-            b.start,
-            b.anreiseZeit || "00:00",
-            b.end,
-            b.abreiseZeit || "23:59"
+          startISO,
+          sZeit,
+          endISO,
+          eZeit,
+          b.start,
+          b.anreiseZeit || "00:00",
+          b.end,
+          b.abreiseZeit || "23:59"
         );
-        } else {
+      } else {
         return ueberschneidenSich(startISO, endISO, b.start, b.end);
-        }
+      }
     });
-    };
+  };
 
   const selectedObjektVerfuegbar = useMemo(() => {
     // Wenn das Erfolgs-Modal offen ist, Verfügbarkeitswarnung im Hintergrund unterdrücken
@@ -270,8 +276,8 @@ export function useBuchungsAssistent() {
     endISO,
     zeiten,
     istVerfuegbar,
+    angenommeneBuchungErfolg,
   ]);
-
 
   // ─── GEBUCHTE UHRZEITEN AM GEWÄHLTEN TAG ERFASSEN ───
   const tagesBuchungen = useMemo(() => {
@@ -317,14 +323,12 @@ export function useBuchungsAssistent() {
     }
 
     return `⚠ ${objName} ist im gewählten Zeitraum bereits belegt.`;
-  }, [tagesBuchungen, selectedObjekt, istHauptobjektStundenbasiert, selectedObjektVerfuegbar]);
+  }, [tagesBuchungen, selectedObjekt, istHauptobjektStundenbasiert, selectedObjektVerfuegbar, angenommeneBuchungErfolg]);
 
   const stundenHauptobjekt = useMemo(() => {
     if (!istHauptobjektStundenbasiert) return 0;
     return berechneStunden(dateRange.start, zeiten.anreiseZeit, dateRange.end, zeiten.abreiseZeit);
   }, [istHauptobjektStundenbasiert, dateRange.start, dateRange.end, zeiten]);
-
-
 
   const freieZusatzobjekte = useMemo(() => {
     if (!dateRange.start || !dateRange.end) return [];
@@ -424,12 +428,21 @@ export function useBuchungsAssistent() {
     const rabatt = parseFloat(rabattProzent?.toString().replace(",", ".")) || 0;
     const berechnet = gesamtpreisBerechnet * (1 - rabatt / 100);
     setEndpreisManuell(berechnet.toFixed(2));
-  }, [gesamtpreisBerechnet]);
+  }, [gesamtpreisBerechnet, rabattProzent]);
 
   const effektiverEndpreis = useMemo(() => {
     const p = parseFloat(endpreisManuell?.toString().replace(",", "."));
     return !isNaN(p) ? p : gesamtpreisBerechnet;
   }, [endpreisManuell, gesamtpreisBerechnet]);
+
+  // ─── WOCHENTAGS-PRÜFUNG ───
+  const checkinWochentagPasst = useMemo(() => {
+    return entsprichtWochentag(dateRange.start, CHECKIN_WOCHENTAG);
+  }, [dateRange.start, CHECKIN_WOCHENTAG]);
+
+  const checkoutWochentagPasst = useMemo(() => {
+    return entsprichtWochentag(dateRange.end, CHECKOUT_WOCHENTAG);
+  }, [dateRange.end, CHECKOUT_WOCHENTAG]);
 
   // ─── VERFÜGBARE OBJEKTE FÜR SCHRITT 1 (erlaubt stundenbasierte Teilbelegung am selben Tag) ───
   const verfuegbareObjekte = useMemo(() => {
@@ -447,80 +460,61 @@ export function useBuchungsAssistent() {
       let info;
       let preis = null;
 
-      if (gueltigerZeitraum && !stundenbasiert && dauer < MINDEST_NAECHTE_WOHNUNG) {
+      const checkinPasst = !gueltigerZeitraum || stundenbasiert || entsprichtWochentag(dateRange.start, CHECKIN_WOCHENTAG);
+      const checkoutPasst = !gueltigerZeitraum || stundenbasiert || entsprichtWochentag(dateRange.end, CHECKOUT_WOCHENTAG);
+
+      if (gueltigerZeitraum && !stundenbasiert && (!checkinPasst || !checkoutPasst)) {
+        status = "nicht verfügbar";
+        if (!checkinPasst && !checkoutPasst && CHECKIN_WOCHENTAG === CHECKOUT_WOCHENTAG) {
+          info = `Nur ${CHECKIN_WOCHENTAG} bis ${CHECKOUT_WOCHENTAG} buchbar`;
+        } else if (!checkinPasst) {
+          info = `Anreise nur am ${CHECKIN_WOCHENTAG} möglich`;
+        } else {
+          info = `Abreise nur am ${CHECKOUT_WOCHENTAG} möglich`;
+        }
+      } else if (gueltigerZeitraum && !stundenbasiert && dauer < MINDEST_NAECHTE_WOHNUNG) {
         status = "nicht verfügbar";
         info = `Mindestaufenthalt: ${MINDEST_NAECHTE_WOHNUNG} Nächte`;
       } else if (!gueltigerZeitraum) {
-        const nowStr = getNowIsoWithTime();
-
-        const activeBooking = bestehendeBuchungen.find((b) => {
-          if (b.resource?.toLowerCase() !== obj.name?.toLowerCase()) return false;
-          const startFull = `${b.start}T${b.anreiseZeit || "00:00"}`;
-          const endFull = `${b.end}T${b.abreiseZeit || "23:59"}`;
-          return nowStr >= startFull && nowStr <= endFull;
-        });
-
-        if (activeBooking) {
-          status = "belegt";
-          info = `Belegt bis ${formatDe(parseISO(activeBooking.end))}${
-            activeBooking.abreiseZeit ? ` (${activeBooking.abreiseZeit} Uhr)` : ""
-          }`;
-        } else {
-          const futureBookings = bestehendeBuchungen
-            .filter((b) => {
-              if (b.resource?.toLowerCase() !== obj.name?.toLowerCase()) return false;
-              const startFull = `${b.start}T${b.anreiseZeit || "00:00"}`;
-              return startFull > nowStr;
-            })
-            .sort((a, b) => {
-              const aFull = `${a.start}T${a.anreiseZeit || "00:00"}`;
-              const bFull = `${b.start}T${b.anreiseZeit || "00:00"}`;
-              return aFull.localeCompare(bFull);
-            });
-
-          status = "frei";
-          info =
-            futureBookings.length > 0
-              ? `Frei bis ${formatDe(parseISO(futureBookings[0].start))}${
-                  futureBookings[0].anreiseZeit ? ` (${futureBookings[0].anreiseZeit} Uhr)` : ""
-                }`
-              : "Durchgehend frei";
-        }
+        // ZENTRALE LIVE-VERFÜGBARKEIT: berücksichtigt lückenlose Anschlussbuchungen und Tagesanreisen
+        const live = berechneLiveVerfuegbarkeit(obj.name, bestehendeBuchungen, einstellungen);
+        status = live.status;
+        info = live.info;
       } else {
-          if (stundenbasiert) {
-            const tagesBelegungen = bestehendeBuchungen.filter(
-              (b) => b.resource?.toLowerCase() === obj.name?.toLowerCase() && b.start <= endISO && b.end >= startISO
-            );
+        if (stundenbasiert) {
+          const tagesBelegungen = bestehendeBuchungen.filter(
+            (b) => b.resource?.toLowerCase() === obj.name?.toLowerCase() && b.start <= endISO && b.end >= startISO
+          );
 
-            const verfuegbarFuerUhrzeit = istVerfuegbar(
-              obj.name,
-              startISO,
-              endISO,
-              STANDARD_ANREISE_ZEIT,
-              STANDARD_ABREISE_ZEIT
-            );
-            const durchgehendBelegt = tagesBelegungen.some(
-              (b) => (b.anreiseZeit === "00:00" && b.abreiseZeit === "23:59") || !b.anreiseZeit || (b.start < startISO && b.end > endISO)
-            );
-            const istMehrtaegig = startISO !== endISO;
+          const verfuegbarFuerUhrzeit = istVerfuegbar(
+            obj.name,
+            startISO,
+            endISO,
+            STANDARD_ANREISE_ZEIT,
+            STANDARD_ABREISE_ZEIT
+          );
+          const durchgehendBelegt = tagesBelegungen.some(
+            (b) => (b.anreiseZeit === "00:00" && b.abreiseZeit === "23:59") || !b.anreiseZeit || (b.start < startISO && b.end > endISO)
+          );
+          const istMehrtaegig = startISO !== endISO;
 
-            if (verfuegbarFuerUhrzeit) {
-              status = "verfügbar";
-              info = tagesBelegungen.length > 0
-                ? "Für gewählte Uhrzeit verfügbar"
-                : "Im gewählten Zeitraum verfügbar";
-              preis = null; // <-- IMMER null, damit im 1. Schritt der Stundensatz ("3,00 € / Std.") steht!
-            } else if (istMehrtaegig || durchgehendBelegt) {
-              status = "nicht verfügbar";
-              info = durchgehendBelegt
-                ? "Im gewählten Zeitraum ganztägig belegt"
-                : "Im gewählten Zeitraum belegt";
-              preis = null;
-            } else {
-              status = "verfügbar";
-              info = "Teilweise belegt (Uhrzeit in Schritt 3 anpassbar)";
-              preis = null;
-            }
+          if (verfuegbarFuerUhrzeit) {
+            status = "verfügbar";
+            info = tagesBelegungen.length > 0
+              ? "Für gewählte Uhrzeit verfügbar"
+              : "Im gewählten Zeitraum verfügbar";
+            preis = null; // <-- IMMER null, damit im 1. Schritt der Stundensatz ("3,00 € / Std.") steht!
+          } else if (istMehrtaegig || durchgehendBelegt) {
+            status = "nicht verfügbar";
+            info = durchgehendBelegt
+              ? "Im gewählten Zeitraum ganztägig belegt"
+              : "Im gewählten Zeitraum belegt";
+            preis = null;
+          } else {
+            status = "verfügbar";
+            info = "Teilweise belegt (Uhrzeit in Schritt 3 anpassbar)";
+            preis = null;
+          }
         } else {
           const verfuegbar = istVerfuegbar(obj.name, startISO, endISO);
           status = verfuegbar ? "verfügbar" : "nicht verfügbar";
@@ -540,14 +534,20 @@ export function useBuchungsAssistent() {
     dateRange.end,
     istVerfuegbar,
     MINDEST_NAECHTE_WOHNUNG,
+    CHECKIN_WOCHENTAG,
+    CHECKOUT_WOCHENTAG,
+    einstellungen,
   ]);
 
   // Buchung ist ungültig, wenn: das Objekt kollidiert, ODER eine Wohnung
+  // den geforderten Checkin-/Checkout-Wochentag nicht einhält, ODER
   // die Mindestaufenthaltsdauer unterschreitet, ODER bei stundenbasierten
   // Objekten Rückgabe- vor Abholzeit liegt (bzw. 0 Stunden Dauer).
   const istBuchungUngueltig =
     !selectedObjektVerfuegbar ||
-    (!istStundenbasiert(selectedObjekt?.name) && naechteAnz < MINDEST_NAECHTE_WOHNUNG) ||
+    (istHauptobjektWohnung && !checkinWochentagPasst) ||
+    (istHauptobjektWohnung && !checkoutWochentagPasst) ||
+    (!istHauptobjektStundenbasiert && naechteAnz < MINDEST_NAECHTE_WOHNUNG) ||
     (istHauptobjektStundenbasiert && stundenHauptobjekt <= 0);
 
   // Wählt ein Objekt in Schritt 1 aus und schlägt bei stundenbasierten
@@ -556,11 +556,34 @@ export function useBuchungsAssistent() {
   const handleSelectObjekt = (obj) => {
     setSelectedObjekt(obj);
 
-    if (istStundenbasiert(obj.name) && dateRange.start && dateRange.end) {
+    let start = dateRange.start;
+    let end = dateRange.end;
+
+    // Automatische Anpassung von Start & Ende je nach Typ
+    if (start) {
+      if (istStundenbasiert(obj.name)) {
+        // Stundenbasiert -> Rückgabedatum ist automatisch Anreisedatum (gleicher Tag)
+        end = start;
+        setDateRange({ start, end: start });
+      } else {
+        // Wohnung -> Abreisedatum ist mindestens der Folgetag
+        if (!end || isSameDay(start, end)) {
+          const folgetag = new Date(start);
+          folgetag.setDate(folgetag.getDate() + 1);
+          end = folgetag;
+          setDateRange({ start, end: folgetag });
+        }
+      }
+    }
+
+    const sISO = toISO(start);
+    const eISO = toISO(end);
+
+    if (istStundenbasiert(obj.name) && start && end) {
       const istStandardFrei = istVerfuegbar(
         obj.name,
-        startISO,
-        endISO,
+        sISO,
+        eISO,
         STANDARD_ANREISE_ZEIT,
         STANDARD_ABREISE_ZEIT
       );
@@ -569,7 +592,7 @@ export function useBuchungsAssistent() {
         setZeiten({ anreiseZeit: STANDARD_ANREISE_ZEIT, abreiseZeit: STANDARD_ABREISE_ZEIT });
       } else {
         const tagesBelegungen = bestehendeBuchungen.filter(
-          (b) => b.resource?.toLowerCase() === obj.name?.toLowerCase() && b.start <= endISO && b.end >= startISO
+          (b) => b.resource?.toLowerCase() === obj.name?.toLowerCase() && b.start <= eISO && b.end >= sISO
         );
 
         let neueZeitGefunden = false;
@@ -585,7 +608,7 @@ export function useBuchungsAssistent() {
             const endH = Math.min(23, h + 4);
             const endZeitStr = `${String(endH).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 
-            if (istVerfuegbar(obj.name, startISO, endISO, naechsteFreieZeit, endZeitStr)) {
+            if (istVerfuegbar(obj.name, sISO, eISO, naechsteFreieZeit, endZeitStr)) {
               setZeiten({ anreiseZeit: naechsteFreieZeit, abreiseZeit: endZeitStr });
               neueZeitGefunden = true;
             }
@@ -726,6 +749,35 @@ export function useBuchungsAssistent() {
     const clickedDate = info.date;
     if (isPastDate(clickedDate)) return;
 
+    // Wenn bereits ein Objekt gewählt ist (z.B. im "Zeitraum ändern"-Modal in Schritt 2/3):
+    if (selectedObjekt) {
+      if (istStundenbasiert(selectedObjekt.name)) {
+        // Stundenbasiert -> gleicher Tag als Start und Ende
+        setDateRange({ start: clickedDate, end: clickedDate });
+        setHoveredDate(null);
+        return;
+      } else {
+        // Wohnung:
+        if (!dateRange.start || (dateRange.start && dateRange.end)) {
+          const nextDay = new Date(clickedDate);
+          nextDay.setDate(nextDay.getDate() + 1);
+          setDateRange({ start: clickedDate, end: nextDay });
+          setHoveredDate(null);
+          return;
+        } else if (dateRange.start && !dateRange.end) {
+          if (clickedDate <= dateRange.start) {
+            const nextDay = new Date(clickedDate);
+            nextDay.setDate(nextDay.getDate() + 1);
+            setDateRange({ start: clickedDate, end: nextDay });
+          } else {
+            setDateRange({ start: dateRange.start, end: clickedDate });
+          }
+          return;
+        }
+      }
+    }
+
+    // In Schritt 1 (noch kein Objekt ausgewählt):
     if (dateRange.start && !dateRange.end) {
       if (clickedDate < dateRange.start) {
         setDateRange({ start: clickedDate, end: null });
@@ -794,6 +846,7 @@ export function useBuchungsAssistent() {
     selectedObjekt,
     setSelectedObjekt,
     istHauptobjektStundenbasiert,
+    istHauptobjektWohnung,
     handleSelectObjekt,
     selectedObjektVerfuegbar,
     guestData,
@@ -811,6 +864,12 @@ export function useBuchungsAssistent() {
     zugewiesenesZusatzobjekt,
     ZUSATZOBJEKT_KOMBI_RABATT_PROZENT,
     MINDEST_NAECHTE_WOHNUNG,
+    CHECKIN_WOCHENTAG,
+    CHECKOUT_WOCHENTAG,
+    checkinWochentagPasst,
+    checkoutWochentagPasst,
+    startWochentag: getWochentagName(dateRange.start),
+    endWochentag: getWochentagName(dateRange.end),
     bookingDetails,
     setBookingDetails,
     rabattProzent,

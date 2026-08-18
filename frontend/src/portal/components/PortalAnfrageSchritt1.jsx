@@ -1,16 +1,51 @@
 import { useState } from "react";
 import { ZeitraumKalender } from "../../components/booking/ZeitraumKalender";
 import { GuestCountModal } from "../../components/booking/GuestCountModal";
-import { formatPrettyDe } from "../../utils/javaUtils";
+import { formatPrettyDe, istStundenbasiert } from "../../utils/javaUtils";
 import "../../styles/shared-ui.css";
 
 export function PortalAnfrageSchritt1({ vm }) {
   const [isKalenderModalOpen, setIsKalenderModalOpen] = useState(false);
 
+  // Baut einen informativen Hinweistext für Wohnungsregeln zusammen
+  const hatWochentagRegel = vm.CHECKIN_WOCHENTAG || vm.CHECKOUT_WOCHENTAG;
+  let wohnungHinweisText = null;
+  if (hatWochentagRegel) {
+    if (vm.CHECKIN_WOCHENTAG && vm.CHECKOUT_WOCHENTAG && vm.CHECKIN_WOCHENTAG === vm.CHECKOUT_WOCHENTAG) {
+      wohnungHinweisText = `Für Wohnungen gilt: Anfragen nur von ${vm.CHECKIN_WOCHENTAG} bis ${vm.CHECKOUT_WOCHENTAG} (Mindestaufenthalt: ${vm.MINDEST_NAECHTE_WOHNUNG} Nächte).`;
+    } else if (vm.CHECKIN_WOCHENTAG && vm.CHECKOUT_WOCHENTAG) {
+      wohnungHinweisText = `Für Wohnungen gilt: Anreise nur ${vm.CHECKIN_WOCHENTAG}, Abreise nur ${vm.CHECKOUT_WOCHENTAG} (Mindestaufenthalt: ${vm.MINDEST_NAECHTE_WOHNUNG} Nächte).`;
+    } else if (vm.CHECKIN_WOCHENTAG) {
+      wohnungHinweisText = `Für Wohnungen gilt: Anreise nur am ${vm.CHECKIN_WOCHENTAG} möglich (Mindestaufenthalt: ${vm.MINDEST_NAECHTE_WOHNUNG} Nächte).`;
+    } else {
+      wohnungHinweisText = `Für Wohnungen gilt: Abreise nur am ${vm.CHECKOUT_WOCHENTAG} möglich (Mindestaufenthalt: ${vm.MINDEST_NAECHTE_WOHNUNG} Nächte).`;
+    }
+  } else if (vm.MINDEST_NAECHTE_WOHNUNG > 1) {
+    wohnungHinweisText = `Für Wohnungen gilt ein Mindestaufenthalt von ${vm.MINDEST_NAECHTE_WOHNUNG} Nächten.`;
+  }
+
   return (
     <div className="buchen-container">
       <h2>Anfrage stellen</h2>
       <p className="subtitle">Zeitraum und Gästezahl wählen, Verfügbarkeit prüfen und unverbindlich anfragen.</p>
+
+      {/* Info-Banner für zentrale Wohnungsregeln */}
+      {wohnungHinweisText && (
+        <div
+          style={{
+            backgroundColor: "#f4f4f5",
+            borderLeft: "4px solid #e30000",
+            padding: "10px 14px",
+            borderRadius: "6px",
+            fontSize: "13px",
+            color: "#3f3f46",
+            marginBottom: "16px",
+            lineHeight: "1.4",
+          }}
+        >
+          ℹ <strong>Hinweis:</strong> {wohnungHinweisText}
+        </div>
+      )}
 
       <div className="booking-search-bar">
         <button
@@ -50,7 +85,7 @@ export function PortalAnfrageSchritt1({ vm }) {
           <div className="availability-list">
             {vm.verfuegbareObjekte.map((obj) => {
               const isAvailable = obj.status === "verfügbar" || obj.status === "frei";
-              const stundenbasiert = !obj.name?.toLowerCase().includes("wohnung");
+              const stundenbasiert = istStundenbasiert(obj.name);
               return (
                 <div key={obj.id} className="availability-row">
                   <div className="obj-name-container">
