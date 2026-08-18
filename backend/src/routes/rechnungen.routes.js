@@ -47,19 +47,24 @@ router.get("/", async (req, res) => {
 async function generiereNaechsteRechnungsnummer() {
   const jahr = new Date().getFullYear();
 
-  const letzteRechnung = await prisma.rechnungen.findFirst({
-    where: { rechnungs_nummer: { startsWith: `RE-${jahr}-` } },
-    orderBy: { rechnungs_nummer: "desc" },
+  // 1. Alle Rechnungsnummern des aktuellen Jahres laden
+  const rechnungenDesJahres = await prisma.rechnungen.findMany({
+    where: {
+      rechnungs_nummer: { startsWith: `RE-${jahr}-` },
+    },
+    select: { rechnungs_nummer: true },
   });
 
-  let naechsteZahl = 1;
-  if (letzteRechnung?.rechnungs_nummer) {
-    const teile = letzteRechnung.rechnungs_nummer.split("-");
-    const letzteZahl = parseInt(teile[teile.length - 1], 10);
-    if (!isNaN(letzteZahl)) {
-      naechsteZahl = letzteZahl + 1;
-    }
-  }
+  // 2. Die hintere Zahl aus jeder Rechnungsnummer extrahieren
+  const vorhandeneZahlen = rechnungenDesJahres.map((r) => {
+    const teile = r.rechnungs_nummer.split("-");
+    const zahl = parseInt(teile[teile.length - 1], 10);
+    return isNaN(zahl) ? 0 : zahl;
+  });
+
+  // 3. Höchste Zahl finden und um 1 erhöhen (startet bei 1, wenn noch keine existiert)
+  const hoechsteZahl = vorhandeneZahlen.length > 0 ? Math.max(...vorhandeneZahlen) : 0;
+  const naechsteZahl = hoechsteZahl + 1;
 
   return `RE-${jahr}-${String(naechsteZahl).padStart(4, "0")}`;
 }

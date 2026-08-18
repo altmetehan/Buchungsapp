@@ -254,16 +254,25 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 25,
     left: 45,
-    width: 505,
+    right: 45,
     borderTopWidth: 0.5,
     borderTopColor: COLORS.borderLight,
     paddingTop: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  footerCol: {
+  footerColLeft: {
     flex: 1,
-    paddingRight: 15,
+    alignItems: 'flex-start',
+  },
+  footerColCenter: {
+    flex: 1,
+    alignItems: 'flex-start',
+    paddingLeft: 60,
+  },
+  footerColRight: {
+    flex: 1,
+    paddingLeft: 60,
   },
   footerHeading: {
     fontFamily: 'Helvetica-Bold',
@@ -509,14 +518,14 @@ export function RechnungDocument({
         { style: styles.footer },
         h(
           View,
-          { style: styles.footerCol },
+          { style: styles.footerColLeft },
           h(Text, { style: styles.footerHeading }, unternehmensDaten.name),
           h(Text, { style: styles.footerText }, unternehmensDaten.strasse),
           h(Text, { style: styles.footerText }, `${unternehmensDaten.plzOrt}, ${unternehmensDaten.land}`)
         ),
         h(
           View,
-          { style: styles.footerCol },
+          { style: styles.footerColCenter },
           h(Text, { style: styles.footerHeading }, 'Bankverbindung'),
           h(Text, { style: styles.footerText }, `Institut: ${unternehmensDaten.bank}`),
           h(Text, { style: styles.footerText }, `IBAN: ${unternehmensDaten.iban}`),
@@ -524,7 +533,7 @@ export function RechnungDocument({
         ),
         h(
           View,
-          { style: [styles.footerCol, { paddingRight: 0 }] },
+          { style: styles.footerColRight },
           h(Text, { style: styles.footerHeading }, 'Firmendaten'),
           h(Text, { style: styles.footerText }, `E-Mail: ${unternehmensDaten.email}`),
           h(Text, { style: styles.footerText }, unternehmensDaten.firmenbuch),

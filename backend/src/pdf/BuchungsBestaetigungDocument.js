@@ -251,20 +251,30 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
 
+
   footer: {
     position: 'absolute',
     bottom: 25,
     left: 45,
-    width: 505,
+    right: 45,
     borderTopWidth: 0.5,
     borderTopColor: COLORS.borderLight,
     paddingTop: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  footerCol: {
+  footerColLeft: {
     flex: 1,
-    paddingRight: 15,
+    alignItems: 'flex-start',
+  },
+  footerColCenter: {
+    flex: 1,
+    alignItems: 'flex-start',
+    paddingLeft: 60,
+  },
+  footerColRight: {
+    flex: 1,
+    paddingLeft: 60,
   },
   footerHeading: {
     fontFamily: 'Helvetica-Bold',
@@ -523,14 +533,14 @@ export function BuchungsbestaetigungDocument({
         { style: styles.footer },
         h(
           View,
-          { style: styles.footerCol },
+          { style: styles.footerColLeft },
           h(Text, { style: styles.footerHeading }, unternehmensDaten.name),
           h(Text, { style: styles.footerText }, unternehmensDaten.strasse),
           h(Text, { style: styles.footerText }, `${unternehmensDaten.plzOrt}, ${unternehmensDaten.land}`)
         ),
         h(
           View,
-          { style: styles.footerCol },
+          { style: styles.footerColCenter },
           h(Text, { style: styles.footerHeading }, 'Kontakt & Support'),
           h(Text, { style: styles.footerText }, `Telefon: ${unternehmensDaten.telefon}`),
           h(Text, { style: styles.footerText }, `E-Mail: ${unternehmensDaten.email}`),
@@ -538,7 +548,7 @@ export function BuchungsbestaetigungDocument({
         ),
         h(
           View,
-          { style: styles.footerCol },
+          { style: styles.footerColRight },
           h(Text, { style: styles.footerHeading }, 'Firmendaten'),
           h(Text, { style: styles.footerText }, unternehmensDaten.firmenbuch),
           h(Text, { style: styles.footerText }, `UID: ${unternehmensDaten.uid}`)
