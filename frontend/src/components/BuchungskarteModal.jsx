@@ -1,7 +1,9 @@
 import "../styles/shared-ui.css";
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   istStundenbasiert,
+  istWohnung,
+  istBus,
   ueberschneidenSich,
   datumZeitUeberschneidenSich,
   germanToISO,
@@ -15,6 +17,7 @@ import { useToast } from "../hooks/useToast";
 import { useEinstellungen } from "../hooks/useEinstellungen";
 
 const BUCHUNGEN_API = "/api/buchungen";
+const OBJEKTE_API = "/api/objekte";
 
 /** Formatiert eine Zahl als "€ 1.234,50". */
 const formatEuro = (zahl) =>
@@ -43,86 +46,67 @@ const toGermanDate = (isoStr) => {
   return `${d}.${m}.${y}`;
 };
 
+/** Berechnet die Differenz zweier Zeitpunkte in Stunden */
+const berechneStunden = (anreiseIso, abreiseIso, anreiseZeit, abreiseZeit) => {
+  if (!anreiseIso || !abreiseIso || !anreiseZeit || !abreiseZeit) return 0;
+  const [sh, sm] = anreiseZeit.split(":").map(Number);
+  const [eh, em] = abreiseZeit.split(":").map(Number);
+  const startD = new Date(anreiseIso);
+  startD.setHours(sh, sm, 0, 0);
+  const endD = new Date(abreiseIso);
+  endD.setHours(eh, em, 0, 0);
+  const diffMs = endD - startD;
+  return diffMs > 0 ? diffMs / (1000 * 60 * 60) : 0;
+};
+
 /**
- * Berechnet den Grundpreis (ohne Rabatt) einer Buchung anhand von
- * Zeitraum, Uhrzeiten (bei stundenbasierten Objekten) und Objektpreis.
- *
- * @param {string} anreiseIso
- * @param {string} abreiseIso
- * @param {string} anreiseZeit - "HH:MM"
- * @param {string} abreiseZeit - "HH:MM"
- * @param {number} unitPreis - Preis pro Nacht ODER Stunde, je nach stundenbasiert
- * @param {boolean} stundenbasiert
- * @returns {number}
+ * Berechnet den Grundpreis (Hauptobjekt + optional Zusatzbus mit Kombirabatt).
  */
-const berechnePreis = (anreiseIso, abreiseIso, anreiseZeit, abreiseZeit, unitPreis, stundenbasiert) => {
+const berechneGesamtPreis = (
+  anreiseIso,
+  abreiseIso,
+  anreiseZeit,
+  abreiseZeit,
+  unitPreis,
+  stundenbasiert,
+  zusatzBusObjekt = null,
+  kombirabattProzent = 0
+) => {
   if (!anreiseIso || !abreiseIso || !unitPreis) return 0;
 
+  let mainPreis = 0;
   if (stundenbasiert) {
-    const [sh, sm] = (anreiseZeit || "09:00").split(":").map(Number);
-    const [eh, em] = (abreiseZeit || "17:00").split(":").map(Number);
-
-    const startD = new Date(anreiseIso);
-    startD.setHours(sh, sm, 0, 0);
-
-    const endD = new Date(abreiseIso);
-    endD.setHours(eh, em, 0, 0);
-
-    const diffMs = endD - startD;
-    const stunden = diffMs > 0 ? diffMs / (1000 * 60 * 60) : 0;
-    return Math.round(stunden * unitPreis * 100) / 100;
+    const stunden = berechneStunden(anreiseIso, abreiseIso, anreiseZeit || "09:00", abreiseZeit || "17:00");
+    mainPreis = stunden * unitPreis;
   } else {
     const startD = new Date(anreiseIso);
     const endD = new Date(abreiseIso);
     const naechte = Math.max(1, Math.round(Math.abs(endD - startD) / (1000 * 60 * 60 * 24)));
-    return Math.round(naechte * unitPreis * 100) / 100;
+    mainPreis = naechte * unitPreis;
   }
+
+  let zusatzPreis = 0;
+  if (zusatzBusObjekt) {
+    const busStunden = berechneStunden(anreiseIso, abreiseIso, anreiseZeit || "15:00", abreiseZeit || "11:00");
+    const busRegulaer = busStunden * (Number(zusatzBusObjekt.preis) || 0);
+    const rabattFaktor = kombirabattProzent > 0 ? 1 - kombirabattProzent / 100 : 1;
+    zusatzPreis = busRegulaer * rabattFaktor;
+  }
+
+  return Math.round((mainPreis + zusatzPreis) * 100) / 100;
 };
 
-/**
- * Prüft, ob der Rückgabe-/Endzeitpunkt (Datum + Uhrzeit zusammen) auch
- * wirklich nach dem Abhol-/Startzeitpunkt liegt. Wird nur für
- * stundenbasierte Objekte gebraucht (Bus/Forum), weil dort Anreise und
- * Abreise am selben Tag liegen können - berechnePreis() würde eine
- * verdrehte Reihenfolge sonst stillschweigend auf 0 Stunden/0€ runden,
- * statt eine Warnung anzuzeigen.
- *
- * @param {string} anreiseIso
- * @param {string} abreiseIso
- * @param {string} anreiseZeit - "HH:MM"
- * @param {string} abreiseZeit - "HH:MM"
- * @returns {boolean}
- */
 const liegtRueckgabeNachAbholung = (anreiseIso, abreiseIso, anreiseZeit, abreiseZeit) => {
-  if (!anreiseIso || !abreiseIso) return true; // fehlendes Datum wird schon vom required-Feld abgefangen
-
+  if (!anreiseIso || !abreiseIso) return true;
   const [sh, sm] = (anreiseZeit || "00:00").split(":").map(Number);
   const [eh, em] = (abreiseZeit || "00:00").split(":").map(Number);
-
   const startD = new Date(anreiseIso);
   startD.setHours(sh, sm, 0, 0);
-
   const endD = new Date(abreiseIso);
   endD.setHours(eh, em, 0, 0);
-
   return endD > startD;
 };
 
-/**
- * BuchungskarteModal
- * -------------------
- * Zeigt eine einzelne Buchung im Detail an und bietet von dort aus drei
- * Zustände: Detailansicht, Bearbeiten (Zeitraum/Uhrzeiten/Preis/Notizen
- * ändern) und eine Lösch-Bestätigung. Wird von Dashboard, Kalender und
- * Reservierungen gleichermaßen genutzt.
- *
- * @param {object} props
- * @param {object|null} props.reservation - die anzuzeigende Buchung, oder null (Modal geschlossen)
- * @param {() => void} props.onClose
- * @param {(id: number) => void} props.onDeleted - wird nach erfolgreichem Löschen aufgerufen
- * @param {(updated: object) => void} props.onUpdated - wird nach erfolgreichem Speichern aufgerufen
- * @returns {JSX.Element|null}
- */
 export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated }) {
   const { einstellungen } = useEinstellungen();
   const { toast, showToast, dismissToast } = useToast();
@@ -132,11 +116,23 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
   const [isEditing, setIsEditing] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
+  const [objekte, setObjekte] = useState([]);
+  const [buchungen, setBuchungen] = useState([]);
+
+  useEffect(() => {
+    fetch(OBJEKTE_API)
+      .then((res) => (res.ok ? res.json() : []))
+      .then(setObjekte)
+      .catch((err) => console.error("Fehler beim Laden der Objekte:", err));
+
+    fetch(BUCHUNGEN_API)
+      .then((res) => (res.ok ? res.json() : []))
+      .then(setBuchungen)
+      .catch((err) => console.error("Fehler beim Laden der Buchungen:", err));
+  }, []);
+
   const todayISO = toISO(new Date());
-
   const istVergangen = reservation?.status === "vergangen";
-
-  // Stornieren darf NUR bei einer noch bevorstehenden Buchung passieren
   const kannStornieren = reservation?.status === "bevorstehend";
 
   const [editForm, setEditForm] = useState({
@@ -144,6 +140,7 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
     abreise: "",
     anreiseZeit: "09:00",
     abreiseZeit: "17:00",
+    objekt_id_2: null,
     preis: 0,
     rabattProzent: "0",
     preisProEinheit: 0,
@@ -153,11 +150,81 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
   const [dateWarnung, setDateWarnung] = useState(null);
   const [pruefeLaeuft, setPruefeLaeuft] = useState(false);
 
+  const hauptobjektName = reservation?.hauptobjektName || reservation?.rawBooking?.Objekte?.name;
+  const zusatzobjektName = reservation?.zusatzobjektName || reservation?.rawBooking?.ObjekteZusatz?.name;
+  const istZusatzEintrag = Boolean(zusatzobjektName && reservation?.resource === zusatzobjektName);
+  const partnerObjektName = istZusatzEintrag ? hauptobjektName : zusatzobjektName;
+  const istKombiBuchung = Boolean(zusatzobjektName || editForm.objekt_id_2);
+
+  const kombirabatt = Number(einstellungen?.kombirabatt) || 0;
+
+  // ─── BUS-OBJEKTE NACH PREIS SORTIEREN ───
+  const busObjekteSortiert = useMemo(() => {
+    return (objekte || [])
+      .filter((o) => istBus(o.name))
+      .sort((a, b) => (Number(a.preis) || 0) - (Number(b.preis) || 0));
+  }, [objekte]);
+
+  // Prüft Verfügbarkeit für einen konkreten Bus
+  const checkBusVerfuegbarkeit = (bus) => {
+    if (!bus || !editForm.anreise || !editForm.abreise) return false;
+
+    const startISO = editForm.anreise;
+    const endISO = editForm.abreise;
+    const startZeit = istKombiBuchung ? einstellungen?.checkin_zeit || "15:00" : editForm.anreiseZeit || "15:00";
+    const endZeit = istKombiBuchung ? einstellungen?.checkout_zeit || "11:00" : editForm.abreiseZeit || "11:00";
+
+    return !buchungen.some((b) => {
+      if (b.id === reservation?.id) return false;
+      const belegtDiesenBus = b.objekt_id === bus.id || b.objekt_id_2 === bus.id;
+      if (!belegtDiesenBus) return false;
+
+      const bStartISO = germanToISO(b.anreise);
+      const bEndISO = germanToISO(b.abreise);
+
+      return datumZeitUeberschneidenSich(
+        startISO,
+        startZeit,
+        endISO,
+        endZeit,
+        bStartISO,
+        b.anreise_zeit || "00:00",
+        bEndISO,
+        b.abreise_zeit || "23:59"
+      );
+    });
+  };
+
+  // Günstigster freier Bus
+  const guenstigsterFreierBus = useMemo(() => {
+    return busObjekteSortiert.find((bus) => checkBusVerfuegbarkeit(bus)) || null;
+  }, [busObjekteSortiert, editForm.anreise, editForm.abreise, editForm.anreiseZeit, editForm.abreiseZeit, buchungen, reservation?.id]);
+
+  const aktuellGewaehlterBus = useMemo(() => {
+    if (!editForm.objekt_id_2) return null;
+    return objekte.find((o) => o.id === editForm.objekt_id_2) || null;
+  }, [objekte, editForm.objekt_id_2]);
+
+  const zielBus = aktuellGewaehlterBus || guenstigsterFreierBus;
+  const isBusVerfuegbar = Boolean(guenstigsterFreierBus || editForm.objekt_id_2);
+
+  // Berechnet den reinen Aufpreis für den Bus (für die UI-Anzeige)
+  const berechneterBusZusatzpreis = useMemo(() => {
+    if (!zielBus || !editForm.anreise || !editForm.abreise) return 0;
+    const stunden = berechneStunden(
+      editForm.anreise,
+      editForm.abreise,
+      einstellungen?.checkin_zeit || "15:00",
+      einstellungen?.checkout_zeit || "11:00"
+    );
+    const regulaer = stunden * (Number(zielBus.preis) || 0);
+    const rabattFaktor = kombirabatt > 0 ? 1 - kombirabatt / 100 : 1;
+    return Math.round(regulaer * rabattFaktor * 100) / 100;
+  }, [zielBus, editForm.anreise, editForm.abreise, einstellungen, kombirabatt]);
+
   if (!reservation) return null;
 
   const stundenbasiert = istStundenbasiert(reservation.resource);
-
-  // ─── GÄSTE-ANZAHL ERMITTELN ───
   const erwachsene = reservation.erwachsene ?? reservation.rawBooking?.erwachsene;
   const kinder = reservation.kinder ?? reservation.rawBooking?.kinder;
 
@@ -166,40 +233,17 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
       ? `${erwachsene} Erwachsene${kinder ? ` · ${kinder} Kind${kinder > 1 ? "er" : ""}` : ""}`
       : null;
 
-
-  // ─── HAUPT-/ZUSATZOBJEKT ZENTRAL ERMITTELN ───
-  // "reservation" wird je nach aufrufender Seite (Dashboard/Kalender/
-  // Reservierungen) leicht unterschiedlich zusammengebaut - manche
-  // Seiten liefern "zusatzobjektName" direkt mit, andere nicht. Deshalb
-  // hier immer zusätzlich auf "rawBooking" zurückfallen (das die
-  // komplette Buchung inkl. Objekte/ObjekteZusatz vom Backend enthält),
-  // statt das an mehreren Stellen unterschiedlich zu handhaben - sonst
-  // würde bei einer Kombibuchung (Wohnung + Bus) je nach aufrufender
-  // Seite nur eines der beiden Objekte auf Verfügbarkeit geprüft.
-  const hauptobjektName = reservation.hauptobjektName || reservation.rawBooking?.Objekte?.name;
-  const zusatzobjektName = reservation.zusatzobjektName || reservation.rawBooking?.ObjekteZusatz?.name;
-
-  // Zeigt diese Karte gerade das Zusatzobjekt (z.B. den Bus-Eintrag im
-  // Kalender) statt das Hauptobjekt an?
-  const istZusatzEintrag = Boolean(zusatzobjektName && reservation.resource === zusatzobjektName);
-
-  // Das jeweils ANDERE Objekt der Kombibuchung - unabhängig davon, ob
-  // gerade die Wohnung oder der Bus in der Karte angezeigt wird.
-  const partnerObjektName = istZusatzEintrag ? hauptobjektName : zusatzobjektName;
-
-  // Eine Kombibuchung ist eine Wohnung MIT mitgebuchtem Bus - erkennbar
-  // daran, dass es überhaupt ein Zusatzobjekt gibt.
-  const istKombiBuchung = Boolean(zusatzobjektName);
-
-  /** Befüllt das Bearbeiten-Formular mit den aktuellen Werten der Buchung und wechselt in den Bearbeiten-Modus. */
+  /** Startet den Bearbeiten-Modus */
   const handleStartEditing = () => {
     const startIso = toIsoDate(reservation.checkIn || reservation.start);
     const endIso = toIsoDate(reservation.checkOut || reservation.end);
 
-    // Bei einer Kombibuchung sind die Buszeiten fest an die Wohnung
-    // gekoppelt (15:00 Abholung / 11:00 Rückgabe) und nicht editierbar.
-    const anrZeit = istKombiBuchung ? einstellungen.checkin_zeit : reservation.anreiseZeit || reservation.rawBooking?.anreise_zeit || "09:00";
-    const abrZeit = istKombiBuchung ? einstellungen.checkout_zeit : reservation.abreiseZeit || reservation.rawBooking?.abreise_zeit || "17:00";
+    const anrZeit = istKombiBuchung
+      ? einstellungen.checkin_zeit
+      : reservation.anreiseZeit || reservation.rawBooking?.anreise_zeit || "09:00";
+    const abrZeit = istKombiBuchung
+      ? einstellungen.checkout_zeit
+      : reservation.abreiseZeit || reservation.rawBooking?.abreise_zeit || "17:00";
 
     let rawPrice = 0;
     if (typeof reservation.preis === "number") {
@@ -209,9 +253,20 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
     }
 
     const unitPreis = reservation.preisProNacht || reservation.rawBooking?.Objekte?.preis || 0;
-    const basePreis = berechnePreis(startIso, endIso, anrZeit, abrZeit, unitPreis, stundenbasiert);
+    const initialZusatzId = reservation.objekt_id_2 || reservation.rawBooking?.objekt_id_2 || null;
+    const initialZusatzObj = objekte.find((o) => o.id === initialZusatzId) || null;
 
-    // Initialen Rabatt ermitteln, falls der vorhandene Preis kleiner als der Grundpreis ist.
+    const basePreis = berechneGesamtPreis(
+      startIso,
+      endIso,
+      anrZeit,
+      abrZeit,
+      unitPreis,
+      stundenbasiert,
+      initialZusatzObj,
+      kombirabatt
+    );
+
     let initialRabatt = "0";
     if (basePreis > 0 && rawPrice > 0 && rawPrice < basePreis) {
       const calcRabatt = ((basePreis - rawPrice) / basePreis) * 100;
@@ -224,6 +279,7 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
       abreise: endIso,
       anreiseZeit: anrZeit,
       abreiseZeit: abrZeit,
+      objekt_id_2: initialZusatzId,
       preis: rawPrice > 0 ? rawPrice : basePreis,
       rabattProzent: initialRabatt,
       preisProEinheit: unitPreis,
@@ -234,21 +290,47 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
     setIsEditing(true);
   };
 
-  // Aktueller Grundpreis (vor Rabatt), live aus dem Formularzustand berechnet.
-  const aktuellerBasePreis = berechnePreis(
+  // Aktueller Grundpreis (Hauptobjekt + ggf. Bus mit Kombirabatt)
+  const aktuellerBasePreis = berechneGesamtPreis(
     editForm.anreise,
     editForm.abreise,
     editForm.anreiseZeit,
     editForm.abreiseZeit,
     editForm.preisProEinheit,
     stundenbasiert,
+    aktuellGewaehlterBus,
+    kombirabatt
   );
 
-  /** Reagiert auf Änderungen an Datum/Uhrzeit: rechnet den Preis (unter Berücksichtigung des aktuellen Rabatts) neu. */
+  /** Umschalten des Zusatzobjekts mit Preisneuberechnung */
+  const handleZusatzobjektToggle = (mitBus) => {
+    const neuerBusId = mitBus ? (guenstigsterFreierBus?.id || editForm.objekt_id_2 || busObjekteSortiert[0]?.id) : null;
+    const gewaehlterBus = mitBus ? objekte.find((o) => o.id === neuerBusId) : null;
+
+    const newBase = berechneGesamtPreis(
+      editForm.anreise,
+      editForm.abreise,
+      editForm.anreiseZeit,
+      editForm.abreiseZeit,
+      editForm.preisProEinheit,
+      stundenbasiert,
+      gewaehlterBus,
+      kombirabatt
+    );
+
+    const rabatt = parseFloat(editForm.rabattProzent?.replace(",", ".")) || 0;
+    const neuerPreis = Math.round(newBase * (1 - rabatt / 100) * 100) / 100;
+
+    setEditForm((prev) => ({
+      ...prev,
+      objekt_id_2: neuerBusId,
+      preis: neuerPreis,
+    }));
+  };
+
   const handleFieldChange = (field, value) => {
     let updatedForm = { ...editForm, [field]: value };
 
-    // ── AUTOMATISCHE ABREISE-/RÜCKGABEDATUM-LOGIK ──
     if (field === "anreise" && value) {
       if (stundenbasiert) {
         if (updatedForm.abreise < updatedForm.anreise) updatedForm.abreise = value;
@@ -256,13 +338,16 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
     }
 
     if (["anreise", "abreise", "anreiseZeit", "abreiseZeit"].includes(field)) {
-      const newBase = berechnePreis(
+      const busObj = objekte.find((o) => o.id === updatedForm.objekt_id_2);
+      const newBase = berechneGesamtPreis(
         updatedForm.anreise,
         updatedForm.abreise,
         updatedForm.anreiseZeit,
         updatedForm.abreiseZeit,
         editForm.preisProEinheit,
         stundenbasiert,
+        busObj,
+        kombirabatt
       );
       const rabatt = parseFloat(editForm.rabattProzent?.replace(",", ".")) || 0;
       updatedForm.preis = Math.round(newBase * (1 - rabatt / 100) * 100) / 100;
@@ -272,7 +357,6 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
     setDateWarnung(null);
   };
 
-  /** Reagiert auf eine manuelle Rabatt-Eingabe (0-100%) und rechnet den Gesamtpreis neu. */
   const handleRabattChange = (e) => {
     const rawVal = e.target.value;
     if (rawVal === "") {
@@ -283,7 +367,7 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
     let num = parseFloat(rawVal.replace(",", "."));
     if (isNaN(num)) return;
 
-    num = Math.max(0, Math.min(100, num)); // Strikte Begrenzung auf 0-100%
+    num = Math.max(0, Math.min(100, num));
     const neuerEndpreis = aktuellerBasePreis * (1 - num / 100);
 
     setEditForm((prev) => ({
@@ -293,7 +377,6 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
     }));
   };
 
-  /** Reagiert auf eine händische Gesamtpreis-Eingabe und rechnet den entsprechenden Rabatt zurück. */
   const handlePreisChange = (e) => {
     const rawVal = e.target.value;
     const neuerPreis = parseFloat(rawVal.replace(",", "."));
@@ -308,13 +391,6 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
     setEditForm((prev) => ({ ...prev, preis: rawVal, rabattProzent: berechneterRabatt }));
   };
 
-  /**
-   * Prüft vorm Speichern, ob das Haupt- und ein evtl. Zusatzobjekt im
-   * neu gewählten Zeitraum noch verfügbar sind (die eigene, alte Buchung
-   * wird dabei natürlich ausgeklammert).
-   *
-   * @returns {Promise<boolean>}
-   */
   const pruefeVerfuegbarkeit = async (neuAnreiseIso, neuAbreiseIso, neuAnreiseZeit, neuAbreiseZeit) => {
     setPruefeLaeuft(true);
     try {
@@ -352,24 +428,25 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
               bel.start,
               bel.anreiseZeit || "00:00",
               bel.end,
-              bel.abreiseZeit || "23:59",
+              bel.abreiseZeit || "23:59"
             );
           }
           return ueberschneidenSich(neuAnreiseIso, neuAbreiseIso, bel.start, bel.end);
         });
       };
 
-      // Zuerst das in der Karte gerade angezeigte Objekt prüfen (Wohnung
-      // ODER Bus, je nachdem welcher Eintrag geöffnet wurde) ...
       if (!pruefeObjekt(reservation.resource)) {
         setDateWarnung(`⚠ ${reservation.resource} ist im neu gewählten Zeitraum bereits belegt.`);
         return false;
       }
 
-      // ... und bei einer Kombibuchung immer auch das jeweils andere
-      // mitgebuchte Objekt (partnerObjektName statt dem u.U. leeren
-      // reservation.zusatzobjektName - siehe Kommentar weiter oben).
-      if (!pruefeObjekt(partnerObjektName)) {
+      if (editForm.objekt_id_2) {
+        const gewaehlterBus = objekte.find((o) => o.id === editForm.objekt_id_2);
+        if (gewaehlterBus && !pruefeObjekt(gewaehlterBus.name)) {
+          setDateWarnung(`⚠ ${gewaehlterBus.name} ist im neu gewählten Zeitraum bereits belegt.`);
+          return false;
+        }
+      } else if (partnerObjektName && !pruefeObjekt(partnerObjektName)) {
         setDateWarnung(`⚠ ${partnerObjektName} ist im neu gewählten Zeitraum bereits belegt.`);
         return false;
       }
@@ -385,34 +462,25 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
     }
   };
 
-  /** Prüft Verfügbarkeit und speichert die Änderungen per PUT-Request beim Backend. */
   const handleSaveEdit = async (e) => {
     e.preventDefault();
 
     const finaleAnreiseZeit = istKombiBuchung ? einstellungen.checkin_zeit : editForm.anreiseZeit;
     const finaleAbreiseZeit = istKombiBuchung ? einstellungen.checkout_zeit : editForm.abreiseZeit;
 
-    // Bei stundenbasierten Objekten (Bus/Forum) muss die Rückgabezeit
-    // wirklich nach der Abholzeit liegen - sonst würde berechnePreis()
-    // das stillschweigend auf 0 Stunden/0€ runden, ohne dass irgendwo
-    // eine Warnung kommt.
     if (stundenbasiert && !liegtRueckgabeNachAbholung(editForm.anreise, editForm.abreise, finaleAnreiseZeit, finaleAbreiseZeit)) {
       setDateWarnung("⚠ Die Rückgabezeit muss nach der Abholzeit liegen.");
       return;
     }
 
-    // Die Mindestaufenthaltsdauer für Wohnungen (aus den zentralen
-    // Einstellungen) gilt auch beim nachträglichen Bearbeiten - sonst
-    // könnte man eine bestehende Wohnungsbuchung hier auf 1 Nacht
-    // runterkürzen, ganz ohne Warnung.
     if (!stundenbasiert) {
       const naechteNeu = Math.max(
         1,
-        Math.round(Math.abs(new Date(editForm.abreise) - new Date(editForm.anreise)) / (1000 * 60 * 60 * 24)),
+        Math.round(Math.abs(new Date(editForm.abreise) - new Date(editForm.anreise)) / (1000 * 60 * 60 * 24))
       );
       if (naechteNeu < einstellungen.mindest_naechte_wohnung) {
         setDateWarnung(
-          `⚠ Mindestaufenthaltsdauer für Wohnungen: ${einstellungen.mindest_naechte_wohnung} Nächte (aktuell gewählt: ${naechteNeu}).`,
+          `⚠ Mindestaufenthaltsdauer für Wohnungen: ${einstellungen.mindest_naechte_wohnung} Nächte (aktuell gewählt: ${naechteNeu}).`
         );
         return;
       }
@@ -430,6 +498,7 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
       const payload = {
         anreise: updatedAnreiseGerman,
         abreise: updatedAbreiseGerman,
+        objekt_id_2: editForm.objekt_id_2 ? Number(editForm.objekt_id_2) : null,
         infos: editForm.infos,
         preis: numericPrice,
         anreise_zeit: finaleAnreiseZeit,
@@ -443,15 +512,14 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
       });
       if (!response.ok) throw new Error("Aktualisieren fehlgeschlagen");
 
-      // Die aufrufende Seite hält ihre eigene Liste im State - hier
-      // direkt das übergebene reservation-Objekt anpassen und per
-      // onUpdated zurückmelden, statt komplett neu vom Server zu laden.
       reservation.checkIn = updatedAnreiseGerman;
       reservation.start = editForm.anreise;
       reservation.checkOut = updatedAbreiseGerman;
       reservation.end = editForm.abreise;
       reservation.anreiseZeit = finaleAnreiseZeit;
       reservation.abreiseZeit = finaleAbreiseZeit;
+      reservation.objekt_id_2 = editForm.objekt_id_2;
+      reservation.zusatzobjektName = zielBus?.name || null;
       reservation.infos = editForm.infos;
       reservation.preis = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(numericPrice);
 
@@ -461,21 +529,13 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
       onClose();
     } catch (err) {
       console.error("Fehler beim Speichern:", err);
-      // Die Karte bleibt bei einem Fehler bewusst offen (kein onClose()
-      // im catch-Block), damit der Toast auch tatsächlich sichtbar
-      // bleibt, statt mit dem Modal sofort wieder zu verschwinden.
       showToast("error", "Speichern fehlgeschlagen. Bitte Backend prüfen.");
     } finally {
       setIsSaving(false);
     }
   };
 
-  /** Löscht die Buchung endgültig per DELETE-Request beim Backend. */
   const handleConfirmDelete = async () => {
-    // Zusätzliche Absicherung direkt hier (nicht nur über den
-    // deaktivierten Button) - falls "showConfirm" aus irgendeinem
-    // Grund doch für eine nicht-bevorstehende Buchung geöffnet würde,
-    // wird das Stornieren trotzdem verweigert.
     if (!kannStornieren) {
       showToast("error", "Nur bevorstehende Buchungen können storniert werden.");
       setShowConfirm(false);
@@ -498,7 +558,6 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
     }
   };
 
-  /** Mindest-Abreisedatum: bei Wohnungen mindestens 1 Tag nach Anreise, bei stundenbasierten Objekten der gleiche Tag. */
   const getMinAbreise = () => {
     if (!editForm.anreise) return todayISO;
     if (!stundenbasiert) {
@@ -509,11 +568,10 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
     return editForm.anreise;
   };
 
-  /** Mindest-Anreisedatum: heute, außer die Buchung lag ohnehin schon in der Vergangenheit (dann bleibt ihr altes Datum erlaubt). */
   const getMinAnreise = () => {
     const anreiseIso = toIsoDate(reservation.start || reservation.checkIn || reservation.rawBooking?.anreise);
-    const todayISO = toISO(new Date());
-    return anreiseIso && anreiseIso < todayISO ? anreiseIso : todayISO;
+    const today = toISO(new Date());
+    return anreiseIso && anreiseIso < today ? anreiseIso : today;
   };
 
   const anrZeit = reservation.anreiseZeit || reservation.rawBooking?.anreise_zeit;
@@ -521,18 +579,9 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
   const zeigeAnreiseZeit = Boolean(anrZeit);
   const zeigeAbreiseZeit = Boolean(abrZeit);
 
-  // Historie aller nachträglichen Preisanpassungen dieser Buchung - wird
-  // von Rechnungen.jsx angelegt, ist hier aber genauso sichtbar, weil
-  // beide Ansichten auf dieselbe Buchung schauen. "rawBooking?.Preisanpassungen"
-  // als Fallback, falls "preisanpassungen" (noch) nicht explizit durchgereicht wurde.
   const rawHistorie = reservation.preisanpassungen || reservation.rawBooking?.Preisanpassungen || [];
-  // Älteste Änderung zuerst; für die umgekehrte Reihenfolge einfach rawHistorie direkt anzeigen.
   const preisHistorie = [...rawHistorie].sort((a, b) => new Date(a.erstellt_am) - new Date(b.erstellt_am));
 
-  // Die drei möglichen Zustände (Detailansicht / Bearbeiten / Lösch-
-  // Bestätigung) werden hier in "inhalt" gesammelt statt als separate
-  // frühe returns, damit EIN gemeinsamer <Toast /> am Ende für alle drei
-  // Zustände gilt, unabhängig davon, welcher gerade aktiv ist.
   let inhalt;
 
   if (showConfirm) {
@@ -610,6 +659,105 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
                 </>
               )}
 
+              {/* Zusatzobjekt-Sektion */}
+              {istWohnung(hauptobjektName || reservation.resource) && busObjekteSortiert.length > 0 && (
+                <div className="input-group full-width" style={{ marginTop: "12px" }}>
+                  <label style={{ fontWeight: "600", marginBottom: "6px", display: "block" }}>
+                    Zusatzobjekt
+                  </label>
+
+                  {/* Grünes Banner oberhalb: Erscheint, wenn bei dieser Buchung bereits ein Bus enthalten ist */}
+                  {Boolean(zusatzobjektName || reservation.objekt_id_2) && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        backgroundColor: "#f0fdf4",
+                        border: "1px solid #bbf7d0",
+                        color: "#15803d",
+                        padding: "8px 12px",
+                        borderRadius: "8px",
+                        fontSize: "13px",
+                        fontWeight: "600",
+                        marginBottom: "10px",
+                      }}
+                    >
+                      <span style={{ fontSize: "14px" }}>✓</span>
+                      <span>
+                        {zusatzobjektName || zielBus?.name || "Bus"} mitgebucht (im Preis enthalten
+                        {kombirabatt > 0 ? `, inkl. ${kombirabatt}% Kombirabatt` : ""})
+                      </span>
+                    </div>
+                  )}
+
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "20px",
+                      alignItems: "center",
+                      padding: "10px 14px",
+                      backgroundColor: "#00000005",
+                      borderRadius: "8px",
+                      border: "1px solid #e4e4e7",
+                    }}
+                  >
+                    {/* Option 1: Kein Zusatzobjekt */}
+                    <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" }}>
+                      <input
+                        type="radio"
+                        name="zusatzobjekt"
+                        checked={!editForm.objekt_id_2}
+                        onChange={() => handleZusatzobjektToggle(false)}
+                      />
+                      <span>Kein Zusatzobjekt</span>
+                    </label>
+
+                    {/* Option 2: [Bus-Name] mitbuchen */}
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        cursor: isBusVerfuegbar ? "pointer" : "not-allowed",
+                        opacity: isBusVerfuegbar ? 1 : 0.5,
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="zusatzobjekt"
+                        checked={Boolean(editForm.objekt_id_2)}
+                        disabled={!isBusVerfuegbar}
+                        onChange={() => handleZusatzobjektToggle(true)}
+                      />
+                      <span style={{ fontWeight: editForm.objekt_id_2 ? "600" : "normal" }}>
+                        {zielBus ? `${zielBus.name} mitbuchen` : "Bus mitbuchen"}
+
+                        {/* Zeigt den Aufpreis nur an, wenn der Bus aktuell NICHT ausgewählt ist */}
+                        {!editForm.objekt_id_2 && isBusVerfuegbar && (
+                          <span style={{ fontSize: "12px", color: "#52525b", fontWeight: "normal", marginLeft: "6px" }}>
+                            (+{formatEuro(berechneterBusZusatzpreis)}{kombirabatt > 0 ? ` inkl. ${kombirabatt}% Kombirabatt` : ""})
+                          </span>
+                        )}
+                      </span>
+
+                      {!isBusVerfuegbar && (
+                        <span
+                          style={{
+                            fontSize: "11px",
+                            fontWeight: "600",
+                            marginLeft: "4px",
+                            color: "#b91c1c",
+                          }}
+                        >
+                          (Im Zeitraum belegt)
+                        </span>
+                      )}
+                    </label>
+                  </div>
+                </div>
+              )}
+
               <div className="input-group">
                 <label>Berechneter Preis (€)</label>
                 <input type="text" disabled className="select-disabled-mock" value={aktuellerBasePreis.toFixed(2)} />
@@ -627,13 +775,15 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
                   onChange={handleRabattChange}
                 />
               </div>
+
               <div className="input-group full-width">
                 <label>Gesamtpreis (€) *</label>
                 <input type="number" step="0.01" min="0" required value={editForm.preis} onChange={handlePreisChange} />
                 <span style={{ fontSize: "12px", color: "#71717a", marginTop: "2px" }}>
-                  Wird bei Datums-, Uhrzeit- oder Rabattänderung automatisch angepasst, kann aber manuell überschrieben werden.
+                  Wird bei Datums-, Uhrzeit-, Bus- oder Rabattänderung automatisch angepasst, kann aber manuell überschrieben werden.
                 </span>
               </div>
+
               <div className="input-group full-width">
                 <label>Notizen / Buchungsinfos</label>
                 <textarea
@@ -721,7 +871,13 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
               </h4>
               <p
                 className="detail-primary-text"
-                style={{ whiteSpace: "pre-wrap", fontSize: "14px", fontWeight: "normal", color: reservation.infos ? "#000" : "#71717a", marginBottom: "0" }}
+                style={{
+                  whiteSpace: "pre-wrap",
+                  fontSize: "14px",
+                  fontWeight: "normal",
+                  color: reservation.infos ? "#000" : "#71717a",
+                  marginBottom: "0",
+                }}
               >
                 {reservation.infos || "Keine zusätzlichen Informationen vom Gast hinterlegt."}
               </p>
@@ -760,7 +916,6 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
                 </div>
               </div>
             )}
-
           </div>
 
           <div className="modal-footer-flex">

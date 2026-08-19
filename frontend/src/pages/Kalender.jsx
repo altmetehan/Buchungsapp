@@ -66,10 +66,15 @@ function buildeKalenderZeile(buchung, objekt, istZusatz) {
     infos: buchung.infos,
     status,
     preis,
+    objekt_id: buchung.objekt_id,
+    objekt_id_2: buchung.objekt_id_2 || null,
+    hauptobjektName: buchung.Objekte?.name || null,
+    zusatzobjektName: buchung.ObjekteZusatz?.name || null,
+    ObjekteZusatz: buchung.ObjekteZusatz || null,
     rawBooking: buchung,
     preisanpassungen: buchung.Preisanpassungen || [],
     erwachsene: buchung.erwachsene,
-    kinder: buchung.kinder
+    kinder: buchung.kinder,
   };
 }
 

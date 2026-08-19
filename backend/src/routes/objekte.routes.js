@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../prismaClient.js";
 import { broadcast } from "../ws.js";
+import { parseGermanDate } from "../utils/dateUtils.js";
 
 const router = Router();
 
@@ -45,7 +46,6 @@ router.put("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     const objektId = Number(req.params.id);
-
     const betroffeneBuchungen = await prisma.buchungen.findMany({
       where: {
         geloescht_am: null,
@@ -56,14 +56,7 @@ router.delete("/:id", async (req, res) => {
     const heute = new Date();
     heute.setHours(0, 0, 0, 0);
 
-    const parseGerman = (str) => {
-      if (!str || typeof str !== "string") return new Date(0);
-      const parts = str.split(".").map(Number);
-      if (parts.length !== 3) return new Date(0);
-      return new Date(parts[2], parts[1] - 1, parts[0]);
-    };
-
-    const hatAktiveBuchung = betroffeneBuchungen.some((b) => parseGerman(b.abreise) >= heute);
+    const hatAktiveBuchung = betroffeneBuchungen.some((b) => parseGermanDate(b.abreise) >= heute);
     if (hatAktiveBuchung) {
       return res.status(400).json({
         error: "Dieses Objekt hat noch aktive oder zukünftige Buchungen und kann nicht gelöscht werden.",
@@ -74,6 +67,7 @@ router.delete("/:id", async (req, res) => {
       where: { id: objektId },
       data: { geloescht_am: new Date() },
     });
+
     broadcast("objekte:changed");
     res.status(204).send();
   } catch (err) {

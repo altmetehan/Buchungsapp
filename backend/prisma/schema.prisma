@@ -30,7 +30,7 @@ model Buchungen {
 model Gaeste {
   id           Int         @id @default(autoincrement())
   name         String
-  email        String?
+  email        String?     @unique(map: "sqlite_autoindex_Gaeste_1")
   telnr        String?
   strasse      String?
   hnr          String?

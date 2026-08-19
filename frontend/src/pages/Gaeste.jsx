@@ -124,13 +124,7 @@ export function Gaeste() {
 
   const handleSaveGuest = async (e) => {
     e.preventDefault();
-
-    // Zentrale Validierung statt verstreuter if-Abfragen. "land" wird
-    // hier nicht per HTML5-required geprüft, weil es ein Custom-
-    // Dropdown ist (CountryDropdown hat zwar selbst ein unsichtbares
-    // Pflicht-Input für die native Browser-Meldung, aber die zentrale
-    // Validierung hier fängt es zusätzlich sauber und einheitlich mit
-    // den anderen Feldern ab).
+    
     const { valid, errors } = validateForm(newGuest, GUEST_VALIDATION_RULES);
     setFormErrors(errors);
     if (!valid) {
@@ -146,7 +140,12 @@ export function Gaeste() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(newGuest),
         });
-        if (!response.ok) throw new Error("Aktualisieren fehlgeschlagen");
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || "Aktualisieren fehlgeschlagen.");
+        }
+
         const aktualisierterGast = await response.json();
         setGuests(guests.map((g) => (g.id === editingGuest.id ? aktualisierterGast : g)));
       } else {
@@ -155,7 +154,12 @@ export function Gaeste() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(newGuest),
         });
-        if (!response.ok) throw new Error("Erstellen fehlgeschlagen");
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || "Erstellen fehlgeschlagen.");
+        }
+
         const neuerGast = await response.json();
         setGuests([neuerGast, ...guests]);
       }
@@ -164,7 +168,8 @@ export function Gaeste() {
       handleCloseModal();
     } catch (err) {
       console.error("Gaeste: Fehler beim Speichern:", err);
-      showToast("error", "Speichern fehlgeschlagen. Bitte Backend prüfen.");
+      // Zeigt nun direkt die Nachricht aus dem Backend an ("Ein Gast mit dieser E-Mail-Adresse existiert bereits.")
+      showToast("error", err.message || "Speichern fehlgeschlagen. Bitte Backend prüfen.");
     } finally {
       setIsSaving(false);
     }

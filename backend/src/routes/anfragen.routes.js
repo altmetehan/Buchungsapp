@@ -2,6 +2,14 @@
 import { Router } from "express";
 import { prisma } from "../prismaClient.js";
 import { broadcast } from "../ws.js";
+import {
+  germanToISO,
+  istStundenbasiert,
+  ueberschneidenSich,
+  datumZeitUeberschneidenSich,
+  berechneStundenISO,
+} from "../utils/dateUtils.js";
+import { generiereNaechsteRechnungsnummer } from "../utils/invoiceUtils.js";
 
 const router = Router();
 
@@ -10,53 +18,9 @@ const MIT_OBJEKTEN_UND_ANFRAGE_GAST = {
   include: { AnfrageGaeste: true, Objekte: true, ObjekteZusatz: true },
 };
 
-// ─── DATUMS- & ÜBERSCHNEIDUNGS-HELFER ───
-
-/** Wandelt "DD.MM.YYYY" in "YYYY-MM-DD" um */
-function germanToISO(dateStr) {
-  if (!dateStr) return "";
-  const [d, m, y] = dateStr.split(".");
-  return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
-}
-
-/** Prüft, ob ein Objekt stundenweise (nicht nächteweise) abgerechnet wird */
-function istStundenbasiert(objekt) {
-  return !objekt?.name?.toLowerCase().includes("wohnung");
-}
-
-/** Nächteweise Überschneidungsprüfung zweier Zeiträume */
-function ueberschneidenSich(startA, endA, startB, endB) {
-  return startA < endB && endA > startB;
-}
-
-/** Stundengenaue Überschneidungsprüfung inkl. Uhrzeit */
-function datumZeitUeberschneidenSich(startA, zeitStartA, endA, zeitEndA, startB, zeitStartB, endB, zeitEndB) {
-  const a1 = new Date(`${startA}T${zeitStartA}`);
-  const a2 = new Date(`${endA}T${zeitEndA}`);
-  const b1 = new Date(`${startB}T${zeitStartB}`);
-  const b2 = new Date(`${endB}T${zeitEndB}`);
-  return a1 < b2 && a2 > b1;
-}
-
-/** Berechnet die Differenz zweier Zeitpunkte in Stunden */
-function berechneStundenISO(startISO, startZeit, endISO, endZeit) {
-  if (!startISO || !endISO || !startZeit || !endZeit) return 0;
-  const [sh, sm] = startZeit.split(":").map(Number);
-  const [eh, em] = endZeit.split(":").map(Number);
-
-  const start = new Date(startISO);
-  start.setHours(sh, sm, 0, 0);
-  const ende = new Date(endISO);
-  ende.setHours(eh, em, 0, 0);
-
-  const diffMs = ende - start;
-  return diffMs > 0 ? diffMs / (1000 * 60 * 60) : 0;
-}
-
 /** Berechnet den vorgeschlagenen Gesamtpreis für eine Anfrage */
 async function berechneVorschlagsPreisBackend(anfrage) {
   if (!anfrage || !anfrage.anreise || !anfrage.abreise) return 0;
-
   const anreiseISO = germanToISO(anfrage.anreise);
   const abreiseISO = germanToISO(anfrage.abreise);
   const startD = new Date(anreiseISO);
@@ -69,7 +33,12 @@ async function berechneVorschlagsPreisBackend(anfrage) {
     const naechte = Math.max(1, Math.round((endD - startD) / (1000 * 60 * 60 * 24)));
     mainPreis = naechte * (anfrage.Objekte?.preis || 0);
   } else {
-    const stunden = berechneStundenISO(anreiseISO, anfrage.anreise_zeit || "09:00", abreiseISO, anfrage.abreise_zeit || "17:00");
+    const stunden = berechneStundenISO(
+      anreiseISO,
+      anfrage.anreise_zeit || "09:00",
+      abreiseISO,
+      anfrage.abreise_zeit || "17:00"
+    );
     mainPreis = stunden * (anfrage.Objekte?.preis || 0);
   }
 
@@ -86,27 +55,6 @@ async function berechneVorschlagsPreisBackend(anfrage) {
   }
 
   return Math.round((mainPreis + zusatzPreis) * 100) / 100;
-}
-
-/** Generiert die nächste fortlaufende Rechnungsnummer (z. B. RE-2026-0001) */
-async function generiereNaechsteRechnungsnummer() {
-  const jahr = new Date().getFullYear();
-
-  const letzteRechnung = await prisma.rechnungen.findFirst({
-    where: { rechnungs_nummer: { startsWith: `RE-${jahr}-` } },
-    orderBy: { rechnungs_nummer: "desc" },
-  });
-
-  let naechsteZahl = 1;
-  if (letzteRechnung?.rechnungs_nummer) {
-    const teile = letzteRechnung.rechnungs_nummer.split("-");
-    const letzteZahl = parseInt(teile[teile.length - 1], 10);
-    if (!isNaN(letzteZahl)) {
-      naechsteZahl = letzteZahl + 1;
-    }
-  }
-
-  return `RE-${jahr}-${String(naechsteZahl).padStart(4, "0")}`;
 }
 
 // GET /api/anfragen - Liefert alle Anfragen sortiert nach Erstelldatum
@@ -147,8 +95,8 @@ router.post("/", async (req, res) => {
 
     // BUGFIX: Bei fehlender/leerer E-Mail null verwenden (verhindert Unique-Constraint-Verletzung bei Leerstrings)
     const emailClean = email && email.trim() !== "" ? email.trim().toLowerCase() : null;
-
     let anfrageGast = null;
+
     if (emailClean) {
       anfrageGast = await prisma.anfrageGaeste.findFirst({
         where: { email: emailClean },
@@ -218,6 +166,7 @@ router.put("/:id/annehmen", async (req, res) => {
       where: { id: anfrageId },
       ...MIT_OBJEKTEN_UND_ANFRAGE_GAST,
     });
+
     if (!anfrage) return res.status(404).json({ error: "Anfrage nicht gefunden" });
     if (anfrage.status !== "offen") {
       return res.status(400).json({ error: "Diese Anfrage wurde bereits bearbeitet" });
@@ -247,7 +196,7 @@ router.put("/:id/annehmen", async (req, res) => {
         if (stunden) {
           return datumZeitUeberschneidenSich(
             anreiseISO, anfrage.anreise_zeit || "00:00", abreiseISO, anfrage.abreise_zeit || "23:59",
-            bel.start, bel.anreiseZeit || "00:00", bel.end, bel.abreiseZeit || "23:59",
+            bel.start, bel.anreiseZeit || "00:00", bel.end, bel.abreiseZeit || "23:59"
           );
         }
         return ueberschneidenSich(anreiseISO, abreiseISO, bel.start, bel.end);
@@ -261,55 +210,58 @@ router.put("/:id/annehmen", async (req, res) => {
       return res.status(409).json({ error: `${anfrage.ObjekteZusatz.name} ist im gewünschten Zeitraum inzwischen belegt.` });
     }
 
-    // BUGFIX: Gast-Matching nur durchführen, wenn aGast.email tatsächlich vorhanden ist
-    const aGast = anfrage.AnfrageGaeste;
-    let gast = null;
-    if (aGast.email) {
-      gast = await prisma.gaeste.findFirst({
-        where: { email: aGast.email, geloescht_am: null },
-      });
-    }
-
-    if (gast) {
-      gast = await prisma.gaeste.update({
-        where: { id: gast.id },
-        data: {
-          name: aGast.name,
-          telnr: aGast.telnr,
-          strasse: aGast.strasse,
-          hnr: aGast.hnr,
-          plz: aGast.plz,
-          stadt: aGast.stadt,
-          land: aGast.land,
-        },
-      });
-    } else {
-      gast = await prisma.gaeste.create({
-        data: {
-          name: aGast.name,
-          email: aGast.email,
-          telnr: aGast.telnr,
-          strasse: aGast.strasse,
-          hnr: aGast.hnr,
-          plz: aGast.plz,
-          stadt: aGast.stadt,
-          land: aGast.land,
-        },
-      });
-    }
-
     const vorschlagsPreis = await berechneVorschlagsPreisBackend(anfrage);
     const finalerPreis =
       preis !== undefined && preis !== null && !isNaN(Number(preis))
         ? Math.round(Number(preis) * 100) / 100
         : vorschlagsPreis;
 
-    const rechnungsNummer = await generiereNaechsteRechnungsnummer();
     const buchungInfos = anfrage.infos && anfrage.infos.trim()
       ? `Nachricht vom Gast: ${anfrage.infos.trim()}`
       : null;
 
+    // Transaktion: Erstellt/Aktualisiert Gast, generiert Rechnungsnummer und legt Buchung, Rechnung & Status atomar an
     const { neueBuchung, aktualisierteAnfrage, neueRechnung } = await prisma.$transaction(async (tx) => {
+      const aGast = anfrage.AnfrageGaeste;
+      let gast = null;
+
+      // BUGFIX: Gast-Matching nur durchführen, wenn aGast.email tatsächlich vorhanden ist
+      if (aGast.email) {
+        gast = await tx.gaeste.findFirst({
+          where: { email: aGast.email, geloescht_am: null },
+        });
+      }
+
+      if (gast) {
+        gast = await tx.gaeste.update({
+          where: { id: gast.id },
+          data: {
+            name: aGast.name,
+            telnr: aGast.telnr,
+            strasse: aGast.strasse,
+            hnr: aGast.hnr,
+            plz: aGast.plz,
+            stadt: aGast.stadt,
+            land: aGast.land,
+          },
+        });
+      } else {
+        gast = await tx.gaeste.create({
+          data: {
+            name: aGast.name,
+            email: aGast.email,
+            telnr: aGast.telnr,
+            strasse: aGast.strasse,
+            hnr: aGast.hnr,
+            plz: aGast.plz,
+            stadt: aGast.stadt,
+            land: aGast.land,
+          },
+        });
+      }
+
+      const rechnungsNummer = await generiereNaechsteRechnungsnummer(tx);
+
       const buchung = await tx.buchungen.create({
         data: {
           gast_id: gast.id,
@@ -376,6 +328,7 @@ router.put("/:id/ablehnen", async (req, res) => {
       data: { status: "abgelehnt", abgelehnt_am: new Date(), ablehnungsgrund: grund.trim() },
       ...MIT_OBJEKTEN_UND_ANFRAGE_GAST,
     });
+
     broadcast("anfragen:changed");
     res.json(aktualisiert);
   } catch (err) {

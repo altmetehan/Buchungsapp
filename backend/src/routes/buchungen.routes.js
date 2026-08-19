@@ -4,8 +4,7 @@ import { prisma } from "../prismaClient.js";
 import { broadcast } from "../ws.js";
 import { renderToBuffer } from "@react-pdf/renderer";
 import React from "react";
-import { RechnungDocument } from "../pdf/RechnungDocument.js";
-import { BuchungsbestaetigungDocument } from "../pdf/BuchungsbestaetigungDocument.js";
+import { BuchungsbestaetigungDocument } from "../pdf/BuchungsBestaetigungDocument.js";
 
 const router = Router();
 
@@ -44,10 +43,37 @@ router.get("/", async (req, res) => {
 // (+ optional objekt_id_2, anreise_zeit, abreise_zeit, preis, infos)
 router.post("/", async (req, res) => {
   try {
+    const {
+      gast_id,
+      objekt_id,
+      objekt_id_2,
+      anreise,
+      abreise,
+      anreise_zeit,
+      abreise_zeit,
+      erwachsene,
+      kinder,
+      preis,
+      infos,
+    } = req.body;
+
     const neueBuchung = await prisma.buchungen.create({
-      data: req.body,
+      data: {
+        gast_id: Number(gast_id),
+        objekt_id: Number(objekt_id),
+        objekt_id_2: objekt_id_2 ? Number(objekt_id_2) : null,
+        anreise,
+        abreise,
+        anreise_zeit: anreise_zeit || null,
+        abreise_zeit: abreise_zeit || null,
+        erwachsene: erwachsene ? Number(erwachsene) : null,
+        kinder: kinder ? Number(kinder) : null,
+        preis: Number(preis),
+        infos: infos || null,
+      },
       ...MIT_GAST_UND_OBJEKTEN,
     });
+
     broadcast("buchungen:changed");
     res.status(201).json(neueBuchung);
   } catch (err) {
@@ -67,7 +93,6 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
   try {
     const buchungId = Number(req.params.id);
-
     const [updated] = await prisma.$transaction([
       prisma.buchungen.update({
         where: { id: buchungId },
@@ -101,7 +126,6 @@ router.put("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     const buchungId = Number(req.params.id);
-
     await prisma.$transaction([
       // 1. Buchung als gelöscht markieren
       prisma.buchungen.update({
@@ -130,16 +154,12 @@ router.delete("/:id", async (req, res) => {
 // zu holen.
 router.get("/:id/preisanpassungen", async (req, res) => {
   try {
-    const rechnungen = await prisma.rechnungen.findMany({
-      where: {
-        Buchungen: {
-          geloescht_am: null,
-        },
-      },
-      ...MIT_BUCHUNG_GAST_UND_OBJEKT,
-      orderBy: { id: "asc" },
+    const buchungId = Number(req.params.id);
+    const preisanpassungen = await prisma.preisanpassungen.findMany({
+      where: { buchung_id: buchungId },
+      orderBy: { erstellt_am: "desc" },
     });
-    res.json(rechnungen);
+    res.json(preisanpassungen);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -148,7 +168,6 @@ router.get("/:id/preisanpassungen", async (req, res) => {
 // POST /api/buchungen/:id/preisanpassungen - legt eine neue Preisanpassung
 // an UND setzt direkt den neuen Preis auf der Buchung selbst.
 // Erwartet im Body: neuer_betrag (Zahl), grund (Pflichttext).
-//
 // Beide Schreibvorgänge (Historie-Eintrag anlegen + Buchung
 // aktualisieren) laufen in einer Transaktion - entweder klappen beide,
 // oder keiner. Ohne das könnte z.B. bei einem Verbindungsabbruch
@@ -230,7 +249,6 @@ router.get("/oeffentlich", async (req, res) => {
 router.get("/:id/pdf", async (req, res) => {
   try {
     const { id } = req.params;
-
     const buchung = await prisma.buchungen.findUnique({
       where: { id: parseInt(id) },
       include: {
@@ -249,10 +267,7 @@ router.get("/:id/pdf", async (req, res) => {
     );
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `inline; filename="Buchungsbestaetigung_${buchung.id}.pdf"`
-    );
+    res.setHeader("Content-Disposition", `inline; filename="Buchungsbestaetigung_${buchung.id}.pdf"`);
     return res.send(pdfBuffer);
   } catch (err) {
     console.error("Fehler beim Erstellen der Buchungsbestätigung:", err);

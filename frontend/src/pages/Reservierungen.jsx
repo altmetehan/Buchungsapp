@@ -98,14 +98,17 @@ export function Reservierungen() {
             checkIn: b.anreise,
             checkOut: b.abreise,
             infos: b.infos,
-            objektId: b.objekt_id,
-            objektId2: b.objekt_id_2,
+            objekt_id: b.objekt_id,
+            objekt_id_2: b.objekt_id_2 || null,
+            hauptobjektName: b.Objekte?.name || null,
             zusatzobjektName: b.ObjekteZusatz?.name || null,
+            ObjekteZusatz: b.ObjekteZusatz || null,
+            rawBooking: b,
             anreiseZeit: b.anreise_zeit,
             abreiseZeit: b.abreise_zeit,
             preisanpassungen: b.Preisanpassungen || [],
             erwachsene: b.erwachsene ?? null,
-            kinder: b.kinder ?? null
+            kinder: b.kinder ?? null,
           };
 
           const heute = new Date();

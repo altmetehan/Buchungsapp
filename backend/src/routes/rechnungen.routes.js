@@ -4,6 +4,7 @@ import { broadcast } from "../ws.js";
 import { renderToBuffer } from "@react-pdf/renderer";
 import React from "react";
 import { RechnungDocument } from "../pdf/RechnungDocument.js";
+import { generiereNaechsteRechnungsnummer } from "../utils/invoiceUtils.js";
 
 const router = Router();
 
@@ -39,41 +40,9 @@ router.get("/", async (req, res) => {
 });
 
 /**
- * Ermittelt die nächste fortlaufende Rechnungsnummer für das aktuelle
- * Jahr im Format "RE-<Jahr>-<laufende Nummer>", z.B. "RE-2026-0013".
- *
- * @returns {Promise<string>}
- */
-async function generiereNaechsteRechnungsnummer() {
-  const jahr = new Date().getFullYear();
-
-  // 1. Alle Rechnungsnummern des aktuellen Jahres laden
-  const rechnungenDesJahres = await prisma.rechnungen.findMany({
-    where: {
-      rechnungs_nummer: { startsWith: `RE-${jahr}-` },
-    },
-    select: { rechnungs_nummer: true },
-  });
-
-  // 2. Die hintere Zahl aus jeder Rechnungsnummer extrahieren
-  const vorhandeneZahlen = rechnungenDesJahres.map((r) => {
-    const teile = r.rechnungs_nummer.split("-");
-    const zahl = parseInt(teile[teile.length - 1], 10);
-    return isNaN(zahl) ? 0 : zahl;
-  });
-
-  // 3. Höchste Zahl finden und um 1 erhöhen (startet bei 1, wenn noch keine existiert)
-  const hoechsteZahl = vorhandeneZahlen.length > 0 ? Math.max(...vorhandeneZahlen) : 0;
-  const naechsteZahl = hoechsteZahl + 1;
-
-  return `RE-${jahr}-${String(naechsteZahl).padStart(4, "0")}`;
-}
-
-/**
  * POST /api/rechnungen - legt eine neue Rechnung zu einer bestehenden
  * Buchung an. Erwartet im Body mindestens: buchung_id, rechnungs_datum
  * (+ optional rechnungs_nummer).
- *
  * Wird "rechnungs_nummer" nicht mitgeschickt (z.B. beim automatischen
  * Anlegen direkt nach einer Buchung aus dem Buchungs-Assistenten),
  * vergibt das Backend selbst eine fortlaufende Nummer. Die
@@ -84,7 +53,6 @@ async function generiereNaechsteRechnungsnummer() {
 router.post("/", async (req, res) => {
   try {
     let { rechnungs_nummer, buchung_id, rechnungs_datum } = req.body;
-
     if (!rechnungs_nummer) {
       rechnungs_nummer = await generiereNaechsteRechnungsnummer();
     }
@@ -169,12 +137,13 @@ router.get("/:id/pdf", async (req, res) => {
       where: { id: Number(req.params.id) },
       ...MIT_VOLLSTAENDIGEN_BUCHUNGSDATEN,
     });
+
     if (!rechnung) {
       return res.status(404).json({ error: "Rechnung nicht gefunden" });
     }
 
     const pdfBuffer = await renderToBuffer(
-      React.createElement(RechnungDocument, { rechnung, buchung: rechnung.Buchungen }),
+      React.createElement(RechnungDocument, { rechnung, buchung: rechnung.Buchungen })
     );
 
     res.setHeader("Content-Type", "application/pdf");
@@ -206,7 +175,7 @@ router.get("/buchung/:buchungId/pdf", async (req, res) => {
     }
 
     const pdfBuffer = await renderToBuffer(
-      React.createElement(RechnungDocument, { rechnung, buchung: rechnung.Buchungen }),
+      React.createElement(RechnungDocument, { rechnung, buchung: rechnung.Buchungen })
     );
 
     res.setHeader("Content-Type", "application/pdf");
