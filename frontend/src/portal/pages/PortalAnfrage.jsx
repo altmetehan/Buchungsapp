@@ -8,16 +8,23 @@ import "../../styles/fullcalendar-theme.css";
 import "../../styles/pageStyles/Buchen.css";
 
 /**
- * PortalAnfrage
- * -------------
- * Seiten-Komponente für die öffentliche 2-Schritte-Anfrage-Seite.
- * Exakt dasselbe Architektur-Muster wie pages/Buchen.jsx: die
- * komplette Logik steckt im usePortalAnfrage()-Hook, diese Datei
- * entscheidet nur noch, welcher der zwei Schritte angezeigt wird.
+ * @file PortalAnfrage.jsx
+ * @description Öffentliche Seite zur Erfassung von Buchungsanfragen für externe Interessenten.
+ *              Steuert den zweistufigen Anfrageprozess (Schritt 1: Objekt-, Zeit- und Busauswahl;
+ *              Schritt 2: Kontaktdaten, Personenanzahl und Notizen) basierend auf dem `usePortalAnfrage`-ViewModel.
+ * @module portal/pages/PortalAnfrage
+ */
+
+/**
+ * PortalAnfrage-Seitenkomponente.
  *
- * @returns {JSX.Element}
+ * @component
+ * @returns {JSX.Element} Der gerenderte 2-Schritte-Anfrage-Wizard inklusive Toast-Meldungen.
  */
 export function PortalAnfrage() {
+  /**
+   * Zentraler ViewModel-State und Aktions-Handler für das öffentliche Buchungsportal.
+   */
   const vm = usePortalAnfrage();
 
   let inhalt;
@@ -38,3 +45,5 @@ export function PortalAnfrage() {
     </>
   );
 }
+
+export default PortalAnfrage;

@@ -6,10 +6,23 @@ import { useToast } from "../hooks/useToast";
 import { validateForm, required, isPositiveNumber } from "../utils/validation";
 import { istWohnung } from "../utils/javaUtils";
 
+/**
+ * @file Objekte.jsx
+ * @description Verwaltung von Ferienunterkünften, Fahrzeugen und sonstigen Mietobjekten.
+ *              Bietet Funktionen zur Pflege von Namen, Beschreibungen, KFZ-Kennzeichen und Preisen
+ *              sowie Validierung und Löschschutz bei aktiven Belegungen.
+ * @module pages/Objekte
+ */
+
 const API_BASE = "/api/objekte";
 
 const LEERES_FORMULAR = { name: "", beschreibung: "", kennzeichen: "", preis: "" };
 
+/**
+ * Validierungsregeln für Objektstammdaten.
+ * @constant
+ * @type {Object.<string, Array<Function>>}
+ */
 const OBJEKT_VALIDATION_RULES = {
   name: [required("Objektname ist erforderlich")],
   beschreibung: [required("Beschreibung ist erforderlich")],
@@ -17,16 +30,10 @@ const OBJEKT_VALIDATION_RULES = {
 };
 
 /**
- * Objekte
- * -------
- * Verwaltung aller vermietbaren Objekte (Wohnungen + andere Objekte
- * wie Bus oder Forum) mit Name, Beschreibung und Preis. Genau wie bei
- * den Gästen gibt es ein gemeinsames Modal für "Neu erstellen" und
- * "Bearbeiten" - welcher der beiden Modi aktiv ist, hängt nur davon
- * ab, ob "editingObject" gesetzt ist (null = Erstellen, ein Objekt =
- * Bearbeiten).
+ * Objekte-Seitenkomponente.
  *
- * @returns {JSX.Element}
+ * @component
+ * @returns {JSX.Element} Die gerenderte Objektverwaltung.
  */
 export function Objekte() {
   const [objects, setObjects] = useState([]);
@@ -66,6 +73,7 @@ export function Objekte() {
   const [objectToDelete, setObjectToDelete] = useState(null);
   const [newObject, setNewObject] = useState(LEERES_FORMULAR);
 
+  /** Öffnet das Modal zum Erstellen eines neuen Objekts. */
   const handleOpenCreateModal = () => {
     setEditingObject(null);
     setFormErrors({});
@@ -73,6 +81,7 @@ export function Objekte() {
     setIsModalOpen(true);
   };
 
+  /** Öffnet das Modal zur Bearbeitung eines bestehenden Objekts. */
   const handleOpenEditModal = (object) => {
     setEditingObject(object);
     setFormErrors({});
@@ -86,12 +95,12 @@ export function Objekte() {
   };
 
   /**
-   * Speichert das Objekt - entweder als Update eines bestehenden
-   * Eintrags (editingObject gesetzt, -> PUT) oder als neuer Eintrag
-   * (-> POST). Der Preis kommt aus dem Formular als Text ("120"), die
-   * Datenbank erwartet dafür eine echte Zahl - deshalb hier die
-   * Umwandlung per parseFloat() (nicht parseInt(), sonst würden
-   * Dezimalstellen wie bei "1,50" verloren gehen).
+   * Speichert das Objekt per POST oder PUT nach Validierung.
+   *
+   * @async
+   * @function
+   * @param {React.FormEvent<HTMLFormElement>} e - Submit-Event.
+   * @returns {Promise<void>}
    */
   const handleSaveObject = async (e) => {
     e.preventDefault();
@@ -110,8 +119,6 @@ export function Objekte() {
       name: newObject.name,
       beschreibung: newObject.beschreibung,
       kennzeichen: newObject.kennzeichen || null,
-      // Auf 2 Nachkommastellen runden, damit Rundungsfehler durch
-      // Fließkomma-Arithmetik nicht als "15.4999999" in der DB landen.
       preis: Math.round(preisZahl * 100) / 100,
     };
 
@@ -133,8 +140,6 @@ export function Objekte() {
           body: JSON.stringify(payload),
         });
         if (!response.ok) throw new Error("Erstellen fehlgeschlagen");
-        // Die echte ID (autoincrement) kommt vom Server - deshalb hier
-        // direkt die Server-Antwort anhängen statt selbst eine ID zu raten.
         setObjects([...objects, await response.json()]);
       }
 
@@ -150,6 +155,13 @@ export function Objekte() {
     }
   };
 
+  /**
+   * Führt das Soft-Delete eines Objekts aus.
+   *
+   * @async
+   * @function
+   * @returns {Promise<void>}
+   */
   const handleConfirmDeleteObject = async () => {
     if (!objectToDelete) return;
     setIsSaving(true);
@@ -172,9 +184,6 @@ export function Objekte() {
 
   const handleInputChange = (e) => {
     setNewObject({ ...newObject, [e.target.name]: e.target.value });
-    // Sobald der Nutzer ein fehlerhaftes Feld korrigiert, dessen Fehler
-    // direkt ausblenden statt bis zum nächsten Speicherversuch stehen
-    // zu lassen - gleiches Prinzip wie in Gaeste.jsx.
     if (formErrors[e.target.name]) setFormErrors({ ...formErrors, [e.target.name]: undefined });
   };
 
@@ -237,15 +246,10 @@ export function Objekte() {
         </div>
       </div>
 
-      {/* MODAL FÜR OBJEKT ERSTELLEN/BEARBEITEN */}
       {isModalOpen && (
         <div className="modal-backdrop">
           <div className="modal-content form-card">
             <h3>{editingObject ? `${editingObject.name} bearbeiten` : "Neues Objekt erstellen"}</h3>
-            {/* noValidate, weil die Pflichtfeld-Prüfung selbst über
-                validateForm() + formErrors läuft (siehe Gaeste.jsx -
-                gleiches Muster, damit beide Formulare sich konsistent
-                anfühlen). */}
             <form onSubmit={handleSaveObject} noValidate>
               <div className="form-grid" style={{ marginTop: "16px" }}>
                 <div className="input-group full-width">
@@ -257,10 +261,6 @@ export function Objekte() {
                     onChange={handleInputChange}
                     placeholder="z.B. Apartment 4"
                   />
-                  {/* Jedes Feld zeigt nur seinen eigenen Fehler an
-                      (formErrors.name gehört zu "name" usw.), damit z.B.
-                      ein fehlerhaftes Beschreibungsfeld auch wirklich
-                      seine eigene Meldung bekommt statt gar keine. */}
                   {formErrors.name && <span style={{ color: "#ef4444", fontSize: "12px" }}>{formErrors.name}</span>}
                 </div>
                 <div className="input-group full-width">
@@ -285,16 +285,8 @@ export function Objekte() {
                     onChange={handleInputChange}
                     placeholder="z.B. BZ-123AB"
                   />
-                  {/* Kennzeichen hat bewusst keine eigene Fehleranzeige -
-                      das Feld ist optional und taucht auch nicht in
-                      OBJEKT_VALIDATION_RULES auf. */}
                 </div>
                 <div className="input-group full-width">
-                  {/* Alles außer einer Wohnung wird stundenweise
-                      abgerechnet (siehe istWohnung()/istStundenbasiert()
-                      in javaUtils.js) - egal ob Bus, Forum oder was in
-                      Zukunft sonst noch dazukommt. Das Label passt sich
-                      live an den eingegebenen Namen an. */}
                   <label>{istWohnung(newObject.name) ? "Preis pro Nacht (€) *" : "Preis pro Stunde (€) *"}</label>
                   <input
                     type="text"
@@ -343,7 +335,6 @@ export function Objekte() {
         </div>
       )}
 
-      {/* Lösch-Bestätigungs-Modal */}
       {objectToDelete && (
         <div className="modal-backdrop">
           <div className="modal-content modal-delete form-card">

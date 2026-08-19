@@ -5,9 +5,9 @@ import logo from '../assets/logorot.png';
 
 /**
  * @file Login.jsx
- * @description Einfache Login-Ansicht für Administratoren und autorisierte Benutzer.
- *              Enthält Formularfelder für Benutzername und Passwort mit einfacher
- *              "Passwort anzeigen"-Checkbox ganz ohne externe Icons.
+ * @description Login-Ansicht für Administratoren und autorisierte Mitarbeiter.
+ *              Stellt ein Authentifizierungsformular mit Kennwortanzeige-Umschaltung bereit.
+ * @module pages/Login
  */
 
 /**
@@ -20,7 +20,8 @@ import logo from '../assets/logorot.png';
  * @returns {JSX.Element} Das gerenderte Login-Formular.
  */
 export default function Login({ onLoginSuccess, onNavigateBack }) {
-    const navigate = useNavigate();
+  const navigate = useNavigate();
+
   /**
    * Formulardaten (Benutzername/E-Mail, Passwort, Merken).
    * @type {[Object, Function]}
@@ -52,6 +53,7 @@ export default function Login({ onLoginSuccess, onNavigateBack }) {
   /**
    * Aktualisiert die Eingabewerte im State.
    *
+   * @function
    * @param {React.ChangeEvent<HTMLInputElement>} e - Input-Event.
    * @returns {void}
    */
@@ -70,6 +72,8 @@ export default function Login({ onLoginSuccess, onNavigateBack }) {
   /**
    * Verarbeitet den Login-Submit.
    *
+   * @async
+   * @function
    * @param {React.FormEvent<HTMLFormElement>} e - Submit-Event.
    * @returns {Promise<void>}
    */
@@ -89,7 +93,6 @@ export default function Login({ onLoginSuccess, onNavigateBack }) {
     setIsLoading(true);
     setErrorMessage(null);
 
-    // Simulation eines Login-Vorgangs (Authentifizierung folgt später)
     setTimeout(() => {
       setIsLoading(false);
       if (onLoginSuccess) {
@@ -153,7 +156,6 @@ export default function Login({ onLoginSuccess, onNavigateBack }) {
               disabled={isLoading}
             />
 
-            {/* Einfaches "Passwort anzeigen" direkt darunter */}
             <label className="login-checkbox-label" style={{ marginTop: '4px' }}>
               <input
                 type="checkbox"

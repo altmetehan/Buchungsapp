@@ -5,6 +5,14 @@ import { Toast } from "../components/ui/Toast";
 import { useToast } from "../hooks/useToast";
 import { parseGermanDate } from "../utils/javaUtils";
 
+/**
+ * @file Rechnungen.jsx
+ * @description Rechnungsverwaltung und Archiv. Bietet Monats- und Jahresfilter,
+ *              Umsatzstatistiken, manuelle Rechnungserstellung zu bestehenden Buchungen,
+ *              Preisanpassungen inklusive Begründungshistorie sowie PDF-Downloads.
+ * @module pages/Rechnungen
+ */
+
 const RECHNUNGEN_API = "/api/rechnungen";
 const BUCHUNGEN_API = "/api/buchungen";
 
@@ -19,6 +27,12 @@ const formatZeitstempel = (isoStr) => {
   return `${d.toLocaleDateString("de-DE")}, ${d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} Uhr`;
 };
 
+/**
+ * Rechnungen-Seitenkomponente.
+ *
+ * @component
+ * @returns {JSX.Element} Die gerenderte Rechnungsansicht.
+ */
 export function Rechnungen() {
   const [rechnungenRaw, setRechnungenRaw] = useState([]);
   const [bookings, setBookings] = useState([]);
@@ -56,6 +70,9 @@ export function Rechnungen() {
     ladeDaten();
   }, []);
 
+  /**
+   * Normalisiert die rohen Rechnungsdaten und verknüpft sie mit Gast- und Preisanpassungshistorien.
+   */
   const invoices = useMemo(() => {
     return rechnungenRaw.map((r) => {
       const buchung = r.Buchungen;
@@ -232,6 +249,14 @@ export function Rechnungen() {
     !isNaN(parseFloat(preisForm.endbetrag)) &&
     Math.round(parseFloat(preisForm.endbetrag) * 100) !== Math.round(preisForm.basisPreis * 100);
 
+  /**
+   * Speichert Rechnungsdaten und führt bei Bedarf eine Preisanpassung durch.
+   *
+   * @async
+   * @function
+   * @param {React.FormEvent<HTMLFormElement>} e - Submit-Event.
+   * @returns {Promise<void>}
+   */
   const handleSaveInvoice = async (e) => {
     e.preventDefault();
 

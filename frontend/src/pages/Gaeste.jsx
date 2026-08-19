@@ -6,11 +6,21 @@ import { validateForm, required, isEmail } from "../utils/validation";
 import "../styles/shared-ui.css";
 import "../styles/pageStyles/Gaeste.css";
 
+/**
+ * @file Gaeste.jsx
+ * @description Verwaltung von Gästestammdaten. Bietet tabellarische Übersicht mit
+ *              Such- und Paginierungsfunktionen, modalen Dialogen zum Anlegen/Bearbeiten
+ *              sowie Soft-Delete mit Prüfung auf bestehende Buchungen.
+ * @module pages/Gaeste
+ */
+
 const API_BASE = "/api/gaeste";
 
-// ─── ZENTRALE VALIDIERUNGSREGELN FÜR DAS GAST-FORMULAR ───
-// Bewusst als Konstante außerhalb der Komponente, damit sie nicht bei
-// jedem Render neu gebaut wird.
+/**
+ * Zentrale Validierungsregeln für Gästedaten.
+ * @constant
+ * @type {Object.<string, Array<Function>>}
+ */
 const GUEST_VALIDATION_RULES = {
   name: [required("Name ist erforderlich")],
   email: [required("E-Mail ist erforderlich"), isEmail()],
@@ -21,6 +31,12 @@ const GUEST_VALIDATION_RULES = {
   land: [required("Bitte ein Land auswählen")],
 };
 
+/**
+ * Gästeverwaltungs-Seitenkomponente.
+ *
+ * @component
+ * @returns {JSX.Element} Die gerenderte Gästeverwaltung.
+ */
 export function Gaeste() {
   const { toast, showToast, dismissToast } = useToast();
 
@@ -38,13 +54,17 @@ export function Gaeste() {
   const [editingGuest, setEditingGuest] = useState(null);
   const [guestToDelete, setGuestToDelete] = useState(null);
 
-  // Feldfehler aus der letzten Validierung, z.B. { email: "..." }
+  /** @type {[Object, Function]} Feldbezogene Validierungsfehler */
   const [formErrors, setFormErrors] = useState({});
 
+  /** @type {[Object, Function]} Formularzustand für neuen oder editierten Gast */
   const [newGuest, setNewGuest] = useState({
     name: "", email: "", telnr: "", strasse: "", hnr: "", plz: "", stadt: "", land: "",
   });
 
+  /**
+   * Lädt alle aktiven Gäste vom Backend.
+   */
   useEffect(() => {
     async function ladeGaeste() {
       try {
@@ -63,6 +83,9 @@ export function Gaeste() {
     ladeGaeste();
   }, []);
 
+  /**
+   * Filtert Gäste basierend auf dem aktuellen Suchbegriff across all attributes.
+   */
   const filteredGuests = useMemo(() => {
     return guests.filter((res) => {
       const search = searchQuery.toLowerCase();
@@ -79,6 +102,9 @@ export function Gaeste() {
     });
   }, [guests, searchQuery]);
 
+  /**
+   * Sortiert die gefilterten Gäste anhand der aktiven Spaltenkonfiguration.
+   */
   const sortedGuests = useMemo(() => {
     return [...filteredGuests].sort((a, b) => {
       const valA = a[sortConfig.key] ?? "";
@@ -89,16 +115,21 @@ export function Gaeste() {
     });
   }, [filteredGuests, sortConfig]);
 
+  /**
+   * Behandelt Änderungen an Texteingabefeldern und setzt bestehende Validierungsfehler zurück.
+   *
+   * @function
+   * @param {React.ChangeEvent<HTMLInputElement>} e - Input-Event.
+   * @returns {void}
+   */
   const handleInputChange = (e) => {
     setNewGuest({ ...newGuest, [e.target.name]: e.target.value });
-    // Sobald der Nutzer ein fehlerhaftes Feld anfasst, dessen Fehler
-    // sofort ausblenden - sonst bleibt die rote Meldung stur stehen,
-    // obwohl schon längst korrigiert wurde.
     if (formErrors[e.target.name]) {
       setFormErrors({ ...formErrors, [e.target.name]: undefined });
     }
   };
 
+  /** Öffnet das Modal im Erstellungsmodus. */
   const handleOpenCreateModal = () => {
     setEditingGuest(null);
     setFormErrors({});
@@ -106,6 +137,7 @@ export function Gaeste() {
     setIsModalOpen(true);
   };
 
+  /** Öffnet das Modal zur Bearbeitung eines bestehenden Gastes. */
   const handleOpenEditModal = (guest) => {
     setEditingGuest(guest);
     setFormErrors({});
@@ -122,6 +154,14 @@ export function Gaeste() {
     setIsModalOpen(true);
   };
 
+  /**
+   * Validiert und speichert einen Gast per POST (Neu) oder PUT (Update).
+   *
+   * @async
+   * @function
+   * @param {React.FormEvent<HTMLFormElement>} e - Submit-Event.
+   * @returns {Promise<void>}
+   */
   const handleSaveGuest = async (e) => {
     e.preventDefault();
     
@@ -168,13 +208,19 @@ export function Gaeste() {
       handleCloseModal();
     } catch (err) {
       console.error("Gaeste: Fehler beim Speichern:", err);
-      // Zeigt nun direkt die Nachricht aus dem Backend an ("Ein Gast mit dieser E-Mail-Adresse existiert bereits.")
       showToast("error", err.message || "Speichern fehlgeschlagen. Bitte Backend prüfen.");
     } finally {
       setIsSaving(false);
     }
   };
 
+  /**
+   * Führt das Soft-Delete eines Gastes im Backend aus.
+   *
+   * @async
+   * @function
+   * @returns {Promise<void>}
+   */
   const handleConfirmDeleteGuest = async () => {
     if (!guestToDelete) return;
     setIsSaving(true);
@@ -182,9 +228,6 @@ export function Gaeste() {
     try {
       const response = await fetch(`${API_BASE}/${guestToDelete.id}`, { method: "DELETE" });
       if (!response.ok) {
-        // Die Backend-Fehlermeldung (z.B. "hat noch aktive Buchungen")
-        // wird 1:1 an den Nutzer weitergereicht, statt ihn nur mit
-        // einem generischen "fehlgeschlagen" allein zu lassen.
         const fehler = await response.json().catch(() => ({}));
         throw new Error(fehler.error || "Löschen fehlgeschlagen");
       }
@@ -200,18 +243,27 @@ export function Gaeste() {
     }
   };
 
+  /** Schließt das Erstell-/Bearbeitungs-Modal. */
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingGuest(null);
     setFormErrors({});
   };
 
+  /**
+   * Ändert die Spaltensortierung.
+   *
+   * @function
+   * @param {string} key - Eigenschaftsname für die Sortierung.
+   * @returns {void}
+   */
   const requestSort = (key) => {
     let direction = "asc";
     if (sortConfig.key === key && sortConfig.direction === "asc") direction = "desc";
     setSortConfig({ key, direction });
   };
 
+  /** Liefert das passende Pfeil-Symbol für den Tabellenheader. */
   const getSortIndicator = (key) => {
     if (sortConfig.key !== key) return "";
     return sortConfig.direction === "asc" ? " ▲" : " ▼";
@@ -222,7 +274,10 @@ export function Gaeste() {
   const currentGuests = sortedGuests.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(sortedGuests.length / itemsPerPage);
 
-  /** Kleiner, wiederverwendbarer Helfer für die rote Fehlermeldung unter einem Feld. */
+  /**
+   * Render-Helfer für Inline-Fehlermeldungen.
+   * @param {{field: string}} props
+   */
   const FieldError = ({ field }) =>
     formErrors[field] ? (
       <span style={{ color: "#ef4444", fontSize: "12px", marginTop: "2px" }}>{formErrors[field]}</span>
@@ -323,9 +378,6 @@ export function Gaeste() {
         <div className="modal-backdrop">
           <div className="modal-content form-card">
             <h3>{editingGuest ? "Gast bearbeiten" : "Neuen Gast erfassen"}</h3>
-            {/* noValidate: HTML5-Pflichtfeld-Popups aus, weil eine eigene,
-                zentrale Validierung mit klareren Meldungen unter jedem
-                Feld angezeigt wird. */}
             <form onSubmit={handleSaveGuest} noValidate>
               <div className="form-grid" style={{ marginTop: "16px" }}>
                 <div className="input-group full-width">

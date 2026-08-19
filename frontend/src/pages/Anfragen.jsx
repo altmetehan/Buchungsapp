@@ -6,18 +6,39 @@ import { useEinstellungen } from "../hooks/useEinstellungen";
 import "../styles/shared-ui.css";
 import "../styles/pageStyles/Anfragen.css";
 
+/**
+ * @file Anfragen.jsx
+ * @description Verwaltung von Buchungsanfragen aus dem öffentlichen Portal.
+ *              Ermöglicht das Einsehen, Ablehnen mit Begründung sowie das Annehmen
+ *              inklusive Rabattvergabe, automatischer Buchungserstellung und Rechnungserzeugung.
+ * @module pages/Anfragen
+ */
+
 const ANFRAGEN_API = "/api/anfragen";
 const BUCHUNGEN_API = "/api/buchungen";
 const RECHNUNGEN_API = "/api/rechnungen";
 
-/** Formatiert einen ISO-Zeitstempel als "DD.MM.YYYY, HH:MM Uhr". */
+/**
+ * Formatiert einen ISO-Zeitstempel als "DD.MM.YYYY, HH:MM Uhr".
+ * @param {string} isoStr
+ * @returns {string}
+ */
 const formatZeitstempel = (isoStr) => {
   if (!isoStr) return "";
   const d = new Date(isoStr);
   return `${d.toLocaleDateString("de-DE")}, ${d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} Uhr`;
 };
 
-/** Hilfsfunktion zur Stundenberechnung bei stundenbasierten Objekten. */
+/**
+ * Hilfsfunktion zur Stundenberechnung bei stundenbasierten Objekten.
+ *
+ * @function
+ * @param {Date} startDatum - Startdatum.
+ * @param {string} startZeit - Startuhrzeit (HH:MM).
+ * @param {Date} endDatum - Enddatum.
+ * @param {string} endZeit - Enduhrzeit (HH:MM).
+ * @returns {number} Differenz in Stunden.
+ */
 const berechneStunden = (startDatum, startZeit, endDatum, endZeit) => {
   if (!startDatum || !endDatum || !startZeit || !endZeit) return 0;
   const [sh, sm] = startZeit.split(":").map(Number);
@@ -32,7 +53,14 @@ const berechneStunden = (startDatum, startZeit, endDatum, endZeit) => {
   return diffMs > 0 ? diffMs / (1000 * 60 * 60) : 0;
 };
 
-/** Berechnet den exakten Vorschlagspreis inkl. Zusatzobjekt & Kombirabatt. */
+/**
+ * Berechnet den exakten Vorschlagspreis inkl. Zusatzobjekt & Kombirabatt für eine Anfrage.
+ *
+ * @function
+ * @param {Object} anfrage - Anfragedaten.
+ * @param {Object} einstellungen - Globale Systemeinstellungen.
+ * @returns {number} Gerundeter Vorschlagspreis.
+ */
 const berechneVorschlagsPreis = (anfrage, einstellungen) => {
   if (!anfrage || !anfrage.anreise || !anfrage.abreise) return 0;
 
@@ -66,6 +94,12 @@ const berechneVorschlagsPreis = (anfrage, einstellungen) => {
   return Math.round((mainPreis + zusatzPreis) * 100) / 100;
 };
 
+/**
+ * Anfragen-Seitenkomponente.
+ *
+ * @component
+ * @returns {JSX.Element} Die gerenderte Anfragenverwaltung.
+ */
 export function Anfragen() {
   const { toast, showToast, dismissToast } = useToast();
   const { einstellungen } = useEinstellungen();
@@ -78,22 +112,25 @@ export function Anfragen() {
 
   const [verarbeiteId, setVerarbeiteId] = useState(null);
 
-  // Details-Modal für Erstansicht der Anfrage
   const [selectedAnfrageDetails, setSelectedAnfrageDetails] = useState(null);
-
-  // Ablehnen-Modal
   const [ablehnenAnfrage, setAblehnenAnfrage] = useState(null);
   const [ablehnungsgrund, setAblehnungsgrund] = useState("");
 
-  // Annehmen-Modal
   const [annehmenAnfrage, setAnnehmenAnfrage] = useState(null);
   const [annehmenBasisPreis, setAnnehmenBasisPreis] = useState(0);
   const [annehmenRabattProzent, setAnnehmenRabattProzent] = useState("0");
   const [annehmenPreis, setAnnehmenPreis] = useState("0");
 
-  // Erfolgs-Modal nach dem Annehmen (mit PDF-Download-Optionen)
   const [angenommeneBuchungErfolg, setAngenommeneBuchungErfolg] = useState(null);
 
+  /**
+   * Lädt alle Anfragen und verknüpfte Buchungen.
+   *
+   * @async
+   * @function
+   * @param {boolean} [isInitial=false]
+   * @returns {Promise<void>}
+   */
   const ladeDaten = async (isInitial = false) => {
     try {
       if (isInitial) setApiLoading(true);
@@ -107,7 +144,6 @@ export function Anfragen() {
 
       const rawAnfragenData = await anfragenRes.json();
 
-      // --- GÄSTEDATEN  AUS AnfrageGaeste ---
       const anfragenData = rawAnfragenData.map((a) => ({
         ...a,
         name: a.AnfrageGaeste?.name || a.name || "",
@@ -142,7 +178,14 @@ export function Anfragen() {
 
   useWebSocket("anfragen:changed", () => ladeDaten(false));
 
-  // ─── SUCH-HELFER (Mehrelement-Suche mit Wortgrenzen-Prüfung) ───
+  /**
+   * Prüft, ob eine Anfrage dem Suchfilter entspricht.
+   *
+   * @function
+   * @param {Object} a - Anfragedatensatz.
+   * @param {string} query - Suchbegriff.
+   * @returns {boolean}
+   */
   const matchesSearch = (a, query) => {
     if (!query.trim()) return true;
 
@@ -200,7 +243,13 @@ export function Anfragen() {
       .sort((a, b) => new Date(b.angenommen_am || b.abgelehnt_am) - new Date(a.angenommen_am || a.abgelehnt_am));
   }, [anfragen, searchQuery]);
 
-  /** Prüft per E-Mail-Abgleich, ob dieser Anfragende bereits als Gast gebucht hat. */
+  /**
+   * Prüft anhand der E-Mail, ob der Gast bereits frühere Buchungen im System hat (Stammgast).
+   *
+   * @function
+   * @param {string} email - E-Mail des Gastes.
+   * @returns {{hatGebucht: boolean, count: number}}
+   */
   const getGastHistorie = (email) => {
     if (!email) return { hatGebucht: false, count: 0 };
     const eLower = email.toLowerCase().trim();
@@ -266,6 +315,13 @@ export function Anfragen() {
     !isNaN(annehmenPreisNum) &&
     Math.abs(annehmenPreisNum - annehmenBasisPreis) > 0.009;
 
+  /**
+   * Bestätigt die Annahme einer Anfrage und erzeugt Buchung sowie Rechnung.
+   *
+   * @async
+   * @function
+   * @returns {Promise<void>}
+   */
   const handleAnnehmenBestaetigen = async () => {
     setVerarbeiteId(annehmenAnfrage.id);
     try {
@@ -299,6 +355,13 @@ export function Anfragen() {
     }
   };
 
+  /**
+   * Lehnt eine Anfrage mit Begründung ab.
+   *
+   * @async
+   * @function
+   * @returns {Promise<void>}
+   */
   const handleAblehnenBestaetigen = async () => {
     if (!ablehnungsgrund.trim()) {
       showToast("error", "Bitte einen Ablehnungsgrund angeben.");

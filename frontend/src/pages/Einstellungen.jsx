@@ -5,19 +5,16 @@ import { Toast } from "../components/ui/Toast";
 import { useEinstellungen } from "../hooks/useEinstellungen";
 import "../styles/shared-ui.css";
 
+/**
+ * @file Einstellungen.jsx
+ * @description Administrationsseite zur Konfiguration globaler Standardeinstellungen
+ *              (Check-in/out-Zeiten, Mindestaufenthaltsdauer, Kombirabatte, Wochentagsrestriktionen).
+ * @module pages/Einstellungen
+ */
+
 const EINSTELLUNGEN_API = "/api/einstellungen";
 
-const WOCHENTAG_OPTIONEN = [
-  { value: "", label: "Keine Einschränkung (Beliebig)" },
-  { value: "Montag", label: "Montag" },
-  { value: "Dienstag", label: "Dienstag" },
-  { value: "Mittwoch", label: "Mittwoch" },
-  { value: "Donnerstag", label: "Donnerstag" },
-  { value: "Freitag", label: "Freitag" },
-  { value: "Samstag", label: "Samstag" },
-  { value: "Sonntag", label: "Sonntag" },
-];
-
+/** Index-Zuordnung für Wochentage zur Berechnung von Differenzen */
 const WOCHENTAGE_INDEX = {
   Sonntag: 0,
   Montag: 1,
@@ -31,6 +28,11 @@ const WOCHENTAGE_INDEX = {
 /**
  * Berechnet einen logischen Vorschlag für die Mindestnächte basierend auf
  * den gewählten Wochentagen (z. B. Fr -> Fr = 7 Nächte, Fr -> So = 2 Nächte).
+ *
+ * @function
+ * @param {string} checkin - Gewählter Anreise-Wochentag.
+ * @param {string} checkout - Gewählter Abreise-Wochentag.
+ * @returns {number|null} Vorgeschlagene Mindestnächteanzahl oder `null`.
  */
 function berechneMindestNaechteVorschlag(checkin, checkout) {
   if (!checkin || !checkout) return null;
@@ -39,13 +41,19 @@ function berechneMindestNaechteVorschlag(checkin, checkout) {
   if (idxStart === undefined || idxEnd === undefined) return null;
 
   const diff = (idxEnd - idxStart + 7) % 7;
-  // Wenn gleicher Wochentag (z.B. Freitag bis Freitag) -> 7 Nächte
   return diff === 0 ? 7 : diff;
 }
 
+/**
+ * Einstellungen-Seitenkomponente.
+ *
+ * @component
+ * @returns {JSX.Element} Das Einstellungsformular.
+ */
 export function Einstellungen() {
   const { einstellungen, loading: apiLoading, error: apiError, reload } = useEinstellungen();
 
+  /** @type {[Object, Function]} Lokaler Formularzustand */
   const [form, setForm] = useState(einstellungen);
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState(null);
@@ -54,7 +62,13 @@ export function Einstellungen() {
     if (!apiLoading) setForm(einstellungen);
   }, [apiLoading, einstellungen]);
 
-  // Passt den Wochentag an und schlägt automatisch eine passende Mindestaufenthaltsdauer vor
+  /**
+   * Behandelt Änderungen am Check-in-Wochentag und aktualisiert den Mindestnächtevorschlag.
+   *
+   * @function
+   * @param {string} neuerCheckin - Neuer Wochentag.
+   * @returns {void}
+   */
   const handleCheckinWochentagChange = (neuerCheckin) => {
     const vorschlag = berechneMindestNaechteVorschlag(neuerCheckin, form.checkout_wochentag);
     setForm((prev) => ({
@@ -64,6 +78,13 @@ export function Einstellungen() {
     }));
   };
 
+  /**
+   * Behandelt Änderungen am Check-out-Wochentag und aktualisiert den Mindestnächtevorschlag.
+   *
+   * @function
+   * @param {string} neuerCheckout - Neuer Wochentag.
+   * @returns {void}
+   */
   const handleCheckoutWochentagChange = (neuerCheckout) => {
     const vorschlag = berechneMindestNaechteVorschlag(form.checkin_wochentag, neuerCheckout);
     setForm((prev) => ({
@@ -73,6 +94,14 @@ export function Einstellungen() {
     }));
   };
 
+  /**
+   * Speichert die Systemeinstellungen persistent per PUT-Request im Backend.
+   *
+   * @async
+   * @function
+   * @param {React.FormEvent<HTMLFormElement>} e - Submit-Event.
+   * @returns {Promise<void>}
+   */
   const handleSave = async (e) => {
     e.preventDefault();
     setIsSaving(true);

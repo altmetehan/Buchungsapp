@@ -8,29 +8,31 @@ import "../styles/shared-ui.css";
 import "../styles/fullcalendar-theme.css";
 import "../styles/pageStyles/Buchen.css";
 
+/**
+ * @file Buchen.jsx
+ * @description Zentraler Einstiegspunkt und Steuerungskomponente für den mehrstufigen
+ *              Buchungs-Wizard (Assistenten). Delegiert die Geschäftslogik an das ViewModel
+ *              `useBuchungsAssistent` und rendert die Schritte 1 (Objekt/Zeitraum), 2 (Zusatzbus/Optionen)
+ *              oder 3 (Gästestammdaten/Abschluss) sowie das Erfolgs-Modal mit PDF-Exporten.
+ * @module pages/Buchen
+ */
+
+/** API-Endpunkt für Buchungsoperationen und PDF-Generierung */
 const BUCHUNGEN_API = "/api/buchungen";
+
+/** API-Endpunkt für Rechnungsoperationen und PDF-Generierung */
 const RECHNUNGEN_API = "/api/rechnungen";
 
 /**
- * Buchen
- * ------
- * Seiten-Komponente für den kompletten Buchungs-Assistenten. Diese
- * Datei macht bewusst fast nichts selbst: sie holt den gesamten
- * Zustand und die Geschäftslogik aus useBuchungsAssistent() (dem
- * "View-Model") und entscheidet nur noch, welcher der drei Schritte
- * gerade angezeigt werden soll. Die Anzeige jedes Schritts steckt in
- * einer eigenen Komponente (BuchenSchritt1/2/3, alle unter
- * components/booking/).
+ * Buchen-Seitenkomponente.
  *
- * Der <Toast /> sitzt bewusst außerhalb der Lade-/Fehler-/Schritt-
- * Verzweigung, damit die Erfolgs-/Fehlermeldung beim Speichern
- * unabhängig davon sichtbar bleibt, was gerade darunter angezeigt wird
- * (z.B. nachdem der Assistent nach einer erfolgreichen Buchung schon
- * wieder auf Schritt 1 zurückgesprungen ist).
- *
- * @returns {JSX.Element}
+ * @component
+ * @returns {JSX.Element} Der gerenderte Buchungs-Wizard mit Toast- und Erfolgsmodal-Overlays.
  */
 export function Buchen() {
+  /**
+   * ViewModel-State und Handler des Buchungsassistenten.
+   */
   const vm = useBuchungsAssistent();
 
   let inhalt;

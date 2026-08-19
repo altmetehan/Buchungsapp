@@ -9,12 +9,33 @@ import "../styles/shared-ui.css";
 import "../styles/fullcalendar-theme.css";
 import { parseGermanDate, toISO, getResourceColor } from "../utils/javaUtils";
 
+/**
+ * @file Kalender.jsx
+ * @description Vollbild-Monatskalender (FullCalendar) zur Belegungsübersicht aller Wohnungen und Fahrzeuge.
+ *              Unterstützt dynamische Legenden-Filterung nach Objekten und Detailansicht über Buchungskarten-Modals.
+ * @module pages/Kalender
+ */
+
 const BUCHUNGEN_API = "/api/buchungen";
 const OBJEKTE_API = "/api/objekte";
 
+/**
+ * Formatiert einen Betrag als deutsche Euro-Währung.
+ * @param {number} betrag
+ * @returns {string}
+ */
 const formatEuro = (betrag) =>
   new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(betrag);
 
+/**
+ * Konstruiert eine normalisierte Datenzeile für Kalender-Events (unterstützt Haupt- und Zusatzobjekte).
+ *
+ * @function
+ * @param {Object} buchung - Buchungsdatensatz.
+ * @param {Object} objekt - Zugehöriges Objekt.
+ * @param {boolean} istZusatz - Ob es sich um das Zusatzobjekt handelt.
+ * @returns {Object|null}
+ */
 function buildeKalenderZeile(buchung, objekt, istZusatz) {
   if (!objekt) return null;
 
@@ -79,18 +100,10 @@ function buildeKalenderZeile(buchung, objekt, istZusatz) {
 }
 
 /**
- * Kalender
- * --------
- * Monatsübersicht (FullCalendar) über alle Buchungen. Legende UND
- * Balkenfarben werden automatisch aus der Objekte-Liste vom Backend
- * gebaut (getResourceColor()).
+ * Kalender-Seitenkomponente.
  *
- * NEU: Klick auf ein Legenden-Item filtert die Kalenderansicht auf NUR
- * dieses Objekt - nochmal draufklicken hebt den Filter wieder auf.
- * "gefiltertesObjekt" hält dabei den Namen des aktuell gewählten
- * Objekts (oder null = kein Filter aktiv, alles sichtbar).
- *
- * @returns {JSX.Element}
+ * @component
+ * @returns {JSX.Element} Die gerenderte Kalenderansicht.
  */
 export function Kalender() {
   const { toast, showToast, dismissToast } = useToast();
@@ -141,10 +154,6 @@ export function Kalender() {
     ladeDaten();
   }, []);
 
-  // Vor dem Bauen der FullCalendar-Events wird - falls ein Filter aktiv
-  // ist - erst die Reservierungsliste auf das gewählte Objekt
-  // eingeschränkt. Ohne Filter (gefiltertesObjekt === null) bleibt
-  // alles sichtbar.
   const sichtbareReservierungen = gefiltertesObjekt
     ? reservations.filter((r) => r.resource === gefiltertesObjekt)
     : reservations;
@@ -164,7 +173,7 @@ export function Kalender() {
 
     return {
       id: booking.eventId,
-      title:`${booking.name} - ${booking.resource}`,
+      title: `${booking.name} - ${booking.resource}`,
       start: isoStart,
       end: formattedEndDate,
       allDay: true,
@@ -183,7 +192,6 @@ export function Kalender() {
     }
   };
 
-  /** Klick auf ein Legenden-Item: setzt den Filter, oder hebt ihn auf, wenn dasselbe Objekt nochmal angeklickt wird. */
   const handleLegendClick = (objektName) => {
     setGefiltertesObjekt((aktuell) => (aktuell === objektName ? null : objektName));
   };
@@ -199,10 +207,6 @@ export function Kalender() {
       </p>
 
       <div className="card-box" style={{ padding: "24px", backgroundColor: "#ffffff" }}>
-        {/* Legende: jedes Item ist jetzt klickbar (echter <button>
-            statt <div>, wegen Tastatur-Bedienbarkeit/Barrierefreiheit).
-            Das aktive Item bekommt einen dezenten roten Rahmen, damit
-            sofort klar ist, welcher Filter gerade aktiv ist. */}
         <div className="calendar-legend">
           {allObjects.map((obj) => {
             const farbe = getResourceColor(obj.name);
@@ -231,7 +235,6 @@ export function Kalender() {
             );
           })}
 
-          {/* Kleiner "Filter aufheben"-Hinweis, nur sichtbar wenn ein Filter aktiv ist */}
           {gefiltertesObjekt && (
             <button
               type="button"
@@ -270,7 +273,7 @@ export function Kalender() {
         }}
         onUpdated={(updated, msg) => {
           setReservations((prev) => prev.map((b) => (b.id === updated.id ? { ...b, ...updated } : b)));
-          if (msg) showToast("success", msg); // <--- Zeigt den grünen Toast auf der Seite an!
+          if (msg) showToast("success", msg);
         }}
       />
       <Toast toast={toast} onClose={dismissToast} />

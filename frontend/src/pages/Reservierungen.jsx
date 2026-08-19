@@ -6,14 +6,30 @@ import { istStundenbasiert, germanToISO, parseGermanDate } from "../utils/javaUt
 import "../styles/shared-ui.css";
 import "../styles/pageStyles/Reservierungen.css";
 
+/**
+ * @file Reservierungen.jsx
+ * @description Reservierungsübersicht sortiert nach Tagen (Heute, Morgen und Zukunft).
+ *              Bietet Suchfilterung, Aufrufen von Buchungsdetails und direkten PDF-Export
+ *              der Buchungsbestätigungen.
+ * @module pages/Reservierungen
+ */
+
 const BUCHUNGEN_API = "/api/buchungen";
 
+/**
+ * Liefert ein Date-Objekt mit relativem Tages-Offset.
+ *
+ * @function
+ * @param {number} offsetDays - Anzahl Tage in die Zukunft/Vergangenheit.
+ * @returns {Date}
+ */
 const getRelativeDate = (offsetDays) => {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
   return d;
 };
 
+/** Formatiert Date nach DD.MM.YYYY */
 const formatDateDe = (date) => {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -21,6 +37,7 @@ const formatDateDe = (date) => {
   return `${d}.${m}.${y}`;
 };
 
+/** Formatiert Date nach YYYY-MM-DD */
 const formatDateISO = (date) => {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -28,6 +45,16 @@ const formatDateISO = (date) => {
   return `${y}-${m}-${d}`;
 };
 
+/**
+ * Berechnet den formatieren Anzeigepreis für eine Buchung.
+ *
+ * @function
+ * @param {Object} b - Buchungsrohdaten.
+ * @param {Object} obj - Normalisiertes Objekt.
+ * @param {Date} anreiseDate - Anreisedatum.
+ * @param {Date} abreiseDate - Abreisedatum.
+ * @returns {string} Formatierter Euro-Preis.
+ */
 const berechneAnzeigePreis = (b, obj, anreiseDate, abreiseDate) => {
   if (b.preis !== null && b.preis !== undefined) {
     return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(b.preis);
@@ -55,6 +82,12 @@ const berechneAnzeigePreis = (b, obj, anreiseDate, abreiseDate) => {
   return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(gesamt);
 };
 
+/**
+ * Reservierungen-Seitenkomponente.
+ *
+ * @component
+ * @returns {JSX.Element} Die gerenderte Reservierungsliste.
+ */
 export function Reservierungen() {
   const { toast, showToast, dismissToast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
@@ -179,13 +212,10 @@ export function Reservierungen() {
     });
   }, [reservationsWithSortDate, searchQuery]);
 
-  // Welche Tage werden gerendert?
   let daysToDisplay = [];
-
   const isSearching = searchQuery.trim() !== "";
 
   if (!isSearching) {
-    // Ohne Suche: Heute & Morgen sind fix sichtbar, plus die nächste künftige Buchung
     daysToDisplay = [heuteSort, morgenSort];
 
     const futureDates = reservationsWithSortDate
@@ -196,8 +226,6 @@ export function Reservierungen() {
       daysToDisplay.push(uniqueFutureDates[0]);
     }
   } else {
-    // Mit aktiver Suche: Nur nach dem echten Anreisetag (sortDate) gruppieren!
-    // Dadurch erscheint jede passende Buchung exakt 1-mal an ihrem Anreisetag.
     const matchingDates = new Set();
     filteredReservations.forEach((res) => {
       if (res.sortDate) matchingDates.add(res.sortDate);
@@ -230,8 +258,6 @@ export function Reservierungen() {
 
       {daysToDisplay.length > 0 ? (
         daysToDisplay.map((sortDate) => {
-          // Ohne Suche gilt bei "HEUTE" der Sonderfall für alle aktuell laufenden Buchungen.
-          // Bei aktiver Suche wird strikt nach dem Anreisetag gefiltert, um Duplikate zu vermeiden.
           const dayReservations = filteredReservations.filter((res) =>
             !isSearching && sortDate === heuteSort
               ? res.status === "aktuell"

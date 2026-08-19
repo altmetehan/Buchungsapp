@@ -24,44 +24,67 @@ import "../styles/fullcalendar-theme.css";
 import "../styles/pageStyles/Dashboard.css";
 import { useWebSocket } from "../hooks/useWebSocket";
 
+/**
+ * @file Dashboard.jsx
+ * @description Haupt-Dashboard der Administrationsumgebung. Visualisiert aggregierte Belegungsstatistiken,
+ *              den sekundengenauen Live-Status aller Wohneinheiten und Fahrzeuge, die nächsten anstehenden
+ *              Ankünfte, offene Anfragen-Badges sowie Schnellzugriffe auf Mini-Kalender und Buchungskarten.
+ * @module pages/Dashboard
+ */
+
 const OBJEKTE_API = "/api/objekte";
 const BUCHUNGEN_API = "/api/buchungen";
 const ANFRAGEN_API = "/api/anfragen";
 const RECHNUNGEN_API = "/api/rechnungen";
 
 /**
- * Dashboard
- * ---------
- * Startseite der App: Kennzahlen-Leiste oben, darunter je eine Sektion
- * für "Wohnungen" und "Andere Objekte" (alles außer Wohnungen - aktuell
- * der Bus und das Forum, aber bewusst offen benannt, falls später noch
- * weitere Objekte dazukommen) mit Live-Status und den nächsten
- * anstehenden Ankünften.
+ * Dashboard-Seitenkomponente.
  *
- * @returns {JSX.Element}
+ * @component
+ * @returns {JSX.Element} Die gerenderte Dashboard-Übersicht.
  */
 export function Dashboard() {
   const { einstellungen } = useEinstellungen();
   const navigate = useNavigate();
   const { toast, showToast, dismissToast } = useToast();
 
+  /** @type {[Array<Object>, Function]} Liste aller normalisierten Reservierungsdatensätze */
   const [reservations, setReservations] = useState([]);
+  /** @type {[Array<Object>, Function]} Liste aller aktiven Mietobjekte */
   const [allObjects, setAllObjects] = useState([]);
+  /** @type {[number, Function]} Anzahl aktuell unbeantworteter Portal-Anfragen */
   const [offeneAnfragenCount, setOffeneAnfragenCount] = useState(0);
 
   const [apiLoading, setApiLoading] = useState(true);
   const [apiError, setApiError] = useState(null);
 
+  /** @type {[Object|null, Function]} Für das Mini-Kalender-Modal ausgewähltes Objekt */
   const [selectedObjForCalendar, setSelectedObjForCalendar] = useState(null);
+  /** @type {[Object|null, Function]} Für die Buchungskarte ausgewählte Reservierung */
   const [selectedResForDetails, setSelectedResForDetails] = useState(null);
 
-  /** Formatiert Gästeanzahl kompakt */
+  /**
+   * Formatiert die Gästeanzahl kompakt als lesbaren Text (z. B. "2 Erwachsene · 1 Kind").
+   *
+   * @function
+   * @param {number|null|undefined} erwachsene - Anzahl der Erwachsenen.
+   * @param {number|null|undefined} kinder - Anzahl der Kinder.
+   * @returns {string|null} Formatierter String oder `null`.
+   */
   const formatGaesteInfo = (erwachsene, kinder) => {
     if (erwachsene === null || erwachsene === undefined) return null;
     const kinderTeil = kinder ? ` · ${kinder} Kind${kinder > 1 ? "er" : ""}` : "";
     return `${erwachsene} Erwachsene${kinderTeil}`;
   };
 
+  /**
+   * Lädt alle Stammdaten, Buchungen und Anfragen asynchron vom Backend und normalisiert diese.
+   *
+   * @async
+   * @function
+   * @param {boolean} [isInitial=false] - Gibt an, ob der globale Ladeindikator angezeigt werden soll.
+   * @returns {Promise<void>}
+   */
   const ladeDashboardDaten = useCallback(async (isInitial = false) => {
     try {
       if (isInitial) setApiLoading(true);
@@ -165,7 +188,7 @@ export function Dashboard() {
     ladeDashboardDaten(true);
   }, [ladeDashboardDaten]);
 
-  // Live-Updates über WebSocket
+  // Live-Synchronisation über WebSockets
   useWebSocket("buchungen:changed", () => ladeDashboardDaten(false));
   useWebSocket("objekte:changed", () => ladeDashboardDaten(false));
   useWebSocket("anfragen:changed", () => ladeDashboardDaten(false));
@@ -179,7 +202,13 @@ export function Dashboard() {
     [allObjects],
   );
 
-  /** Ermittelt den Belegungsstatus für heute und nächste Änderungen */
+  /**
+   * Ermittelt den minutengenauen Live-Belegungsstatus eines Objekts für den aktuellen Zeitpunkt.
+   *
+   * @function
+   * @param {string} resourceName - Name des zu prüfenden Objekts.
+   * @returns {{status: string, guest: string, zusatz: string|null, kombiMit: string|null, subDate: string}} Statusobjekt.
+   */
   const getLiveStatus = (resourceName) => {
     const nameLower = resourceName.toLowerCase();
     const nowStr = getNowIsoWithTime();
@@ -201,30 +230,28 @@ export function Dashboard() {
     });
 
     if (activeBooking) {
-    const isHauptobjekt = activeBooking.resource?.toLowerCase() === nameLower;
-    const isZusatzobjekt = activeBooking.zusatzobjektName?.toLowerCase() === nameLower;
+      const isHauptobjekt = activeBooking.resource?.toLowerCase() === nameLower;
+      const isZusatzobjekt = activeBooking.zusatzobjektName?.toLowerCase() === nameLower;
 
-    // Wenn Wohnung -> zeigt "+ Vito Bus"
-    // Wenn Zusatzobjekt (Bus) -> zeigt "(mit Wohnung 1)"
-    let zusatz = null;
-    let kombiMit = null;
+      let zusatz = null;
+      let kombiMit = null;
 
-    if (isHauptobjekt && activeBooking.zusatzobjektName) {
-      zusatz = activeBooking.zusatzobjektName;
-    } else if (isZusatzobjekt && activeBooking.resource) {
-      kombiMit = activeBooking.resource;
+      if (isHauptobjekt && activeBooking.zusatzobjektName) {
+        zusatz = activeBooking.zusatzobjektName;
+      } else if (isZusatzobjekt && activeBooking.resource) {
+        kombiMit = activeBooking.resource;
+      }
+
+      return {
+        status: "belegt",
+        guest: activeBooking.guestName,
+        zusatz,
+        kombiMit,
+        subDate: `bis ${formatDe(parseISO(activeBooking.end))}${
+          activeBooking.abreiseZeit ? ` (${activeBooking.abreiseZeit} Uhr)` : ""
+        }`,
+      };
     }
-
-    return {
-      status: "belegt",
-      guest: activeBooking.guestName,
-      zusatz,
-      kombiMit, // z. B. "Wohnung 1"
-      subDate: `bis ${formatDe(parseISO(activeBooking.end))}${
-        activeBooking.abreiseZeit ? ` (${activeBooking.abreiseZeit} Uhr)` : ""
-      }`,
-    };
-  }
 
     const futureBookings = reservations
       .filter((b) => {
@@ -257,7 +284,9 @@ export function Dashboard() {
     return { status: "frei", guest: "-", zusatz: null, subDate: "durchgehend frei" };
   };
 
-  // Nächste Ankünfte für Wohnungen
+  /**
+   * Berechnet die nächsten 3 anstehenden Ankünfte für alle Ferienwohnungen.
+   */
   const apartmentArrivals = useMemo(() => {
     const nowStr = getNowIsoWithTime();
 
@@ -285,7 +314,9 @@ export function Dashboard() {
       }));
   }, [reservations]);
 
-  // Nächste Ankünfte für andere Objekte
+  /**
+   * Berechnet die nächsten 5 anstehenden Ankünfte für andere Objekte (z. B. Busse).
+   */
   const andereObjekteArrivals = useMemo(() => {
     const nowStr = getNowIsoWithTime();
 
@@ -321,6 +352,9 @@ export function Dashboard() {
       });
   }, [reservations]);
 
+  /**
+   * Aggregiert Gesamtzahlen und momentane Auslastung für die Statistikleiste.
+   */
   const stats = useMemo(() => {
     const totalApts = wohnungen.length;
     const totalAndere = andereObjekte.length;
@@ -337,6 +371,12 @@ export function Dashboard() {
     };
   }, [reservations, wohnungen, andereObjekte]);
 
+  /**
+   * Erstellt formatierte Kalenderevents für das MiniKalenderModal des gewählten Objekts.
+   *
+   * @function
+   * @returns {Array<Object>} Event-Array für FullCalendar.
+   */
   const getFilteredEventsForCalendar = () => {
     if (!selectedObjForCalendar) return [];
 
@@ -366,6 +406,13 @@ export function Dashboard() {
     });
   };
 
+  /**
+   * Öffnet die Rechnung als PDF im neuen Tab für das aktuell belegte Objekt.
+   *
+   * @function
+   * @param {Object} obj - Das ausgewählte Objekt.
+   * @returns {void}
+   */
   const handlePdfClick = (obj) => {
     const nameLower = obj.name.toLowerCase();
     const nowStr = getNowIsoWithTime();
@@ -385,6 +432,13 @@ export function Dashboard() {
     }
   };
 
+  /**
+   * Öffnet die Buchungskarte beim Klick auf ein Event im MiniKalender.
+   *
+   * @function
+   * @param {string|number} bookingId - ID der Buchung.
+   * @returns {void}
+   */
   const handleCalendarEventClick = (bookingId) => {
     const booking = reservations.find((b) => b.id.toString() === bookingId.toString());
     if (booking) {
@@ -392,6 +446,13 @@ export function Dashboard() {
     }
   };
 
+  /**
+   * Öffnet die Buchungskarte beim Klick auf einen Listeneintrag der anstehenden Ankünfte.
+   *
+   * @function
+   * @param {number} bookingId - ID der Buchung.
+   * @returns {void}
+   */
   const handleArrivalDetailsClick = (bookingId) => {
     const booking = reservations.find((b) => b.id === bookingId);
     if (booking) setSelectedResForDetails(booking);

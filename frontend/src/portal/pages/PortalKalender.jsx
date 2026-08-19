@@ -6,39 +6,47 @@ import "../../styles/shared-ui.css";
 import "../../styles/fullcalendar-theme.css";
 import { istStundenbasiert, toISO, getResourceColor } from "../../utils/javaUtils";
 
+/**
+ * @file PortalKalender.jsx
+ * @description Öffentlicher Belegungsplan für Interessenten und externe Webseitenbesucher.
+ *              Zeigt Belegungszeiträume aller Mietobjekte in einem Monatskalender (FullCalendar) an.
+ *              Aus Datenschutzgründen werden serverseitig ausschließlich anonymisierte Daten
+ *              (Objektname und Zeitraum) ohne jegliche Gast- oder Preisinformationen übertragen.
+ *              Ermöglicht interaktives Filtern der Ansicht durch Klick auf die Legenden-Objekte.
+ * @module portal/pages/PortalKalender
+ */
+
+/** Endpunkt für öffentliche, anonymisierte Buchungsdaten */
 const OEFFENTLICHE_BUCHUNGEN_API = "/api/buchungen/oeffentlich";
+
+/** Endpunkt für Objektstammdaten (Wohnungen, Busse etc.) */
 const OBJEKTE_API = "/api/objekte";
 
 /**
- * PortalKalender
- * --------------
- * Öffentlicher Belegungsplan für Interessenten - baugleich zum
- * internen Kalender.jsx (gleiche Legende, gleiches FullCalendar-Setup),
- * ABER bewusst OHNE jegliche Gästedaten: weder im Event-Titel noch
- * sonst irgendwo taucht ein Name, eine E-Mail oder ein Preis auf - aus
- * Datenschutzgründen sieht ein Besucher hier NUR, DASS und WANN etwas
- * belegt ist, nicht VON WEM. Die Daten kommen deshalb von einem
- * eigenen, bewusst reduzierten Backend-Endpunkt
- * (GET /api/buchungen/oeffentlich), der serverseitig gar keine
- * Gästedaten mitschickt - nicht nur im Frontend versteckt.
+ * PortalKalender-Seitenkomponente.
  *
- * Klick auf ein Legenden-Item filtert die Kalenderansicht auf NUR
- * dieses Objekt - nochmal draufklicken hebt den Filter wieder auf.
- * "gefiltertesObjekt" hält dabei den Namen des aktuell gewählten
- * Objekts (oder null = kein Filter aktiv, alles sichtbar).
- *
- * Bewusst KEIN eventClick/Detailkarte - ohne Gästedaten gäbe es dort
- * nichts Sinnvolles zusätzlich zu zeigen.
- *
- * @returns {JSX.Element}
+ * @component
+ * @returns {JSX.Element} Der gerenderte öffentliche Belegungsplan mit filterbarer Legende.
  */
 export function PortalKalender() {
+  /** @type {[Array<Object>, Function]} Liste aller normalisierten Kalender-Events */
   const [events, setEvents] = useState([]);
+
+  /** @type {[Array<Object>, Function]} Liste aller verfügbaren Mietobjekte */
   const [allObjects, setAllObjects] = useState([]);
+
+  /** @type {[string|null, Function]} Aktiver Objekt-Filtername (null = alle sichtbar) */
   const [gefiltertesObjekt, setGefiltertesObjekt] = useState(null);
+
+  /** @type {[boolean, Function]} Ladezustand während der API-Abfrage */
   const [apiLoading, setApiLoading] = useState(true);
+
+  /** @type {[string|null, Function]} Fehlermeldung bei API-Problemen */
   const [apiError, setApiError] = useState(null);
 
+  /**
+   * Lädt die öffentlichen Belegungs- und Objektdaten vom Backend und baut Kalenderevents auf.
+   */
   useEffect(() => {
     async function ladeDaten() {
       try {
@@ -47,16 +55,16 @@ export function PortalKalender() {
           fetch(OEFFENTLICHE_BUCHUNGEN_API),
           fetch(OBJEKTE_API),
         ]);
-        if (!buchungenRes.ok || !objekteRes.ok) throw new Error(`Server antwortete mit einem Fehlerstatus`);
+        if (!buchungenRes.ok || !objekteRes.ok) {
+          throw new Error(`Server antwortete mit einem Fehlerstatus`);
+        }
 
         const buchungen = await buchungenRes.json();
         setAllObjects(await objekteRes.json());
 
         const rows = [];
         buchungen.forEach((b) => {
-          // Für jedes belegte Objekt (Haupt- UND ggf. Zusatzobjekt) ein
-          // eigenes Balken-Event bauen - Titel ist bewusst NUR der
-          // Objektname + "Belegt", niemals ein Gastname.
+          // Für jedes belegte Objekt (Haupt- und optionales Zusatzobjekt) ein Event erstellen
           [b.Objekte, b.ObjekteZusatz].forEach((objekt, idx) => {
             if (!objekt) return;
 
@@ -69,18 +77,19 @@ export function PortalKalender() {
             realEndDate.setDate(realEndDate.getDate() + 1);
             const formattedEndDate = realEndDate.toISOString().split("T")[0];
 
-            const stundenbasiertUndEinTag = (objektname) => istStundenbasiert(objektname) && b.anreise === b.abreise;
+            const stundenbasiertUndEinTag = (objektname) =>
+              istStundenbasiert(objektname) && b.anreise === b.abreise;
 
             const farbe = getResourceColor(objekt.name);
 
             rows.push({
               id: `${b.id}-${idx}`,
               resource: objekt.name,
-              title: stundenbasiertUndEinTag(objekt.name) ? 
-                `${objekt.name} -  ${b.anreise_zeit} bis ${b.abreise_zeit}` : // stundenbasiertes Objekt, An- und Abreise am selben Tag
-                    istStundenbasiert(objekt.name) 
-                        ? `${objekt.name} · ab ${b.anreise_zeit} / bis ${b.abreise_zeit}` : // stundenbasiertes Objekt, An- und Abreise an unterschiedlichen Tagen 
-                            `${objekt.name} · Belegt`,  // kein stundenbasiertes Objekt
+              title: stundenbasiertUndEinTag(objekt.name)
+                ? `${objekt.name} -  ${b.anreise_zeit} bis ${b.abreise_zeit}`
+                : istStundenbasiert(objekt.name)
+                  ? `${objekt.name} · ab ${b.anreise_zeit} / bis ${b.abreise_zeit}`
+                  : `${objekt.name} · Belegt`,
               start: isoStart,
               end: formattedEndDate,
               allDay: true,
@@ -103,12 +112,20 @@ export function PortalKalender() {
     ladeDaten();
   }, []);
 
-  /** Klick auf ein Legenden-Item: setzt den Filter, oder hebt ihn auf, wenn dasselbe Objekt nochmal angeklickt wird. */
+  /**
+   * Setzt den Objektfilter bei Klick auf ein Legenden-Element oder hebt ihn auf.
+   *
+   * @function
+   * @param {string} objektName - Name des angeklickten Objekts.
+   * @returns {void}
+   */
   const handleLegendClick = (objektName) => {
     setGefiltertesObjekt((aktuell) => (aktuell === objektName ? null : objektName));
   };
 
-  // Vor dem Rendern im Kalender werden die Events gefiltert
+  /**
+   * Filtert die Kalender-Events basierend auf dem aktuell aktiven Legenden-Filter.
+   */
   const sichtbareEvents = gefiltertesObjekt
     ? events.filter((e) => e.resource === gefiltertesObjekt)
     : events;
@@ -124,10 +141,7 @@ export function PortalKalender() {
       </p>
 
       <div className="card-box" style={{ padding: "24px", backgroundColor: "#ffffff" }}>
-        {/* Legende: jedes Item ist klickbar (echter <button>
-            statt <div>, wegen Tastatur-Bedienbarkeit/Barrierefreiheit).
-            Das aktive Item bekommt einen dezenten roten Rahmen, damit
-            sofort klar ist, welcher Filter gerade aktiv ist. */}
+        {/* Legende mit barrierefreien, filterbaren Buttons */}
         <div className="calendar-legend">
           {allObjects.map((obj) => {
             const farbe = getResourceColor(obj.name);
@@ -156,19 +170,26 @@ export function PortalKalender() {
             );
           })}
 
-          {/* Kleiner "Filter aufheben"-Hinweis, nur sichtbar wenn ein Filter aktiv ist */}
+          {/* Button zum Zurücksetzen des aktiven Filters */}
           {gefiltertesObjekt && (
             <button
               type="button"
               className="legend-item"
               onClick={() => setGefiltertesObjekt(null)}
-              style={{ cursor: "pointer", color: "#71717a", fontWeight: 600, background: "none", border: "none" }}
+              style={{
+                cursor: "pointer",
+                color: "#71717a",
+                fontWeight: 600,
+                background: "none",
+                border: "none",
+              }}
             >
               × Filter aufheben
             </button>
           )}
         </div>
 
+        {/* FullCalendar Monatsgitter */}
         <FullCalendar
           plugins={[dayGridPlugin]}
           initialView="dayGridMonth"
@@ -184,3 +205,5 @@ export function PortalKalender() {
     </div>
   );
 }
+
+export default PortalKalender;
