@@ -4,6 +4,27 @@ import { GuestCountModal } from "../../components/booking/GuestCountModal";
 import { formatPrettyDe, istStundenbasiert } from "../../utils/javaUtils";
 import "../../styles/shared-ui.css";
 
+/**
+ * PortalAnfrageSchritt1
+ * ----------------------
+ * Schritt 1 der öffentlichen 2-Schritte-Anfrage-Seite: Zeitraum &
+ * Gästezahl wählen und direkt sehen, welche Objekte dafür verfügbar
+ * sind. Reine Anzeige - der komplette Zustand kommt aus dem
+ * usePortalAnfrage-Hook ("vm"). Optisch und strukturell bewusst eng
+ * an BuchenSchritt1.jsx (interner Buchungs-Assistent) angelehnt - der
+ * einzige fachliche Unterschied ist, dass hier am Ende eine
+ * unverbindliche Anfrage statt einer echten Buchung entsteht (siehe
+ * Schritt 2 / usePortalAnfrage.js).
+ *
+ * Baut zusätzlich lokal (nur für die Anzeige, kein eigener Hook-State)
+ * einen zusammengesetzten Hinweistext für die zentralen
+ * Wohnungs-Regeln (Wochentags-Einschränkung + Mindestaufenthalt)
+ * zusammen, da dieser Text je nach Kombination der Einstellungen
+ * unterschiedlich formuliert werden muss.
+ *
+ * @param {{vm: object}} props - vm = das View-Model aus usePortalAnfrage()
+ * @returns {JSX.Element}
+ */
 export function PortalAnfrageSchritt1({ vm }) {
   const [isKalenderModalOpen, setIsKalenderModalOpen] = useState(false);
 

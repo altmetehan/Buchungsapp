@@ -6,6 +6,27 @@ import { istWohnung } from "../../utils/javaUtils";
 import "../../styles/shared-ui.css";
 import "../../styles/pageStyles/AnfrageErstellen.css";
 
+/**
+ * PortalAnfrageSchritt2
+ * ----------------------
+ * Schritt 2 (letzter Schritt) der öffentlichen Anfrage-Seite:
+ * Uhrzeiten (bei stundenbasierten Objekten), Kontaktdaten des
+ * Anfragenden, optionaler Zusatz-Bus sowie der finale
+ * "Anfrage senden"-Button samt Erfolgs-/Fehler-Modal. Reine Anzeige -
+ * der komplette Zustand kommt aus dem usePortalAnfrage-Hook ("vm").
+ *
+ * Optisch und strukturell eng an BuchenSchritt2.jsx /
+ * BuchenSchritt3.jsx (interner Buchungs-Assistent) angelehnt, aber
+ * bewusst OHNE Rabatt-/Endpreis-Feinschliff und OHNE
+ * Gäste-Autofill-Vorschläge: ein anonymer Interessent auf der
+ * öffentlichen Seite hat weder Zugriff auf den internen Gästestamm
+ * noch die Berechtigung, selbst einen Preis festzulegen - das
+ * passiert erst später im Backoffice (Anfragen.jsx), wenn ein Admin
+ * die Anfrage annimmt.
+ *
+ * @param {{vm: object}} props - vm = das View-Model aus usePortalAnfrage()
+ * @returns {JSX.Element}
+ */
 export function PortalAnfrageSchritt2({ vm }) {
   const { einstellungen } = useEinstellungen();
 

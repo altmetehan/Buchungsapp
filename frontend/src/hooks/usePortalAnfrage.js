@@ -1,3 +1,4 @@
+// hooks/usePortalAnfrage.js
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   formatDe,
@@ -18,6 +19,23 @@ import {
 import { useEinstellungen } from "./useEinstellungen";
 import { useToast } from "./useToast";
 
+/**
+ * usePortalAnfrage.js
+ * --------------------
+ * Zentrales "View-Model" für die öffentliche 2-Schritte-Anfrage-Seite
+ * (PortalAnfrage.jsx + PortalAnfrageSchritt1/2). Bündelt sämtlichen
+ * Zustand (gewählter Zeitraum, Objekt, Gästedaten, Preisberechnung,
+ * Verfügbarkeitsprüfung) und die komplette Geschäftslogik an einer
+ * Stelle - die Schritt-Komponenten selbst sind reine Anzeige und
+ * greifen nur auf das hier zurückgegebene "vm"-Objekt zu.
+ *
+ * Pendant für den internen Buchungs-Assistenten: useBuchungsAssistent.js
+ * (sehr ähnlicher Aufbau, aber dort mit Rabatt/Endpreis-Feinschliff,
+ * Gäste-Autofill aus der Gästeliste und echter Buchungs- statt
+ * Anfragen-Semantik - hier landet am Ende eine unverbindliche Anfrage
+ * im Backend statt direkt einer Buchung).
+ */
+
 const OBJEKTE_API = "/api/objekte";
 const OEFFENTLICHE_BUCHUNGEN_API = "/api/buchungen/oeffentlich";
 const ANFRAGEN_API = "/api/anfragen";
@@ -25,10 +43,22 @@ const ANFRAGEN_API = "/api/anfragen";
 const STANDARD_ANREISE_ZEIT = "09:00";
 const STANDARD_ABREISE_ZEIT = "17:00";
 
+/** Leeres Gästeformular als Ausgangs-/Reset-Zustand von Schritt 2. */
 const LEERES_GASTFORMULAR = {
   name: "", email: "", telnr: "", strasse: "", hausnummer: "", plz: "", stadt: "", land: "Österreich",
 };
 
+/**
+ * Berechnet die Dauer zwischen zwei Datum+Uhrzeit-Punkten in Stunden.
+ * Wird für die Preisberechnung stundenbasierter Objekte (Bus, Forum)
+ * gebraucht.
+ *
+ * @param {Date|string} startDatum
+ * @param {string} startZeit - "HH:MM"
+ * @param {Date|string} endDatum
+ * @param {string} endZeit - "HH:MM"
+ * @returns {number} Stunden als Dezimalzahl, 0 falls Eingaben fehlen oder das Ende vor dem Start liegt
+ */
 const berechneStunden = (startDatum, startZeit, endDatum, endZeit) => {
   if (!startDatum || !endDatum || !startZeit || !endZeit) return 0;
   const [sh, sm] = startZeit.split(":").map(Number);
@@ -43,6 +73,26 @@ const berechneStunden = (startDatum, startZeit, endDatum, endZeit) => {
   return diffMs > 0 ? diffMs / (1000 * 60 * 60) : 0;
 };
 
+/**
+ * usePortalAnfrage
+ * -----------------
+ * Lädt Objekt- und (bewusst gästedatenlose) Belegungs-Stammdaten vom
+ * öffentlichen Backend-Endpunkt und stellt den kompletten
+ * 2-Schritte-Anfrage-Wizard (Zeitraum & Objekt wählen -> Kontaktdaten
+ * & Absenden) als ein einziges View-Model bereit.
+ *
+ * @returns {object} vm - enthält u.a.:
+ *   - wizardStep, setWizardStep: aktueller Schritt (1 oder 2)
+ *   - dateRange, handleDateClick, handleClearSelection: Zeitraumauswahl
+ *   - objektStammdaten, verfuegbareObjekte, istVerfuegbar: Objekt-Verfügbarkeit
+ *   - selectedObjekt, handleSelectObjekt, selectedObjektVerfuegbar: gewähltes Objekt
+ *   - gastData, handleGastChange: Kontaktdaten des Anfragenden (Schritt 2)
+ *   - zeiten, stundenHauptobjekt: Uhrzeiten & Dauer bei stundenbasierten Objekten
+ *   - zusatzobjektVerfuegbar, zugewiesenesZusatzobjekt: optionaler Zusatz-Bus
+ *   - gesamtpreisBerechnet: reine Preisanzeige (kein Rabatt/Endpreis wie im internen Assistenten)
+ *   - istAnfrageUngueltig, handleSubmitAnfrage: Validierung & Absenden
+ *   - toast, dismissToast, wurdeGesendet, sendError, handleNeueAnfrage: Erfolgs-/Fehler-Feedback
+ */
 export function usePortalAnfrage() {
   const { einstellungen } = useEinstellungen();
   const { toast, showToast, dismissToast } = useToast();
@@ -54,11 +104,13 @@ export function usePortalAnfrage() {
 
   const [wizardStep, setWizardStep] = useState(1);
 
+  // ─── BACKEND-DATEN ───
   const [objektStammdaten, setObjektStammdaten] = useState([]);
   const [belegungen, setBelegungen] = useState([]);
   const [apiLoading, setApiLoading] = useState(true);
   const [apiError, setApiError] = useState(null);
 
+  // ─── ZEITRAUM & GÄSTE ───
   const [dateRange, setDateRange] = useState({ start: null, end: null });
   const [hoveredDate, setHoveredDate] = useState(null);
 
@@ -69,6 +121,8 @@ export function usePortalAnfrage() {
   const [zeiten, setZeiten] = useState({ anreiseZeit: STANDARD_ANREISE_ZEIT, abreiseZeit: STANDARD_ABREISE_ZEIT });
 
   const [bookingDetails, setBookingDetails] = useState({ zusatzobjektMieten: "Nein" });
+
+  // ─── FORMULARDATEN (KONTAKTDATEN DES ANFRAGENDEN) ───
   const [gastData, setGastData] = useState(LEERES_GASTFORMULAR);
   const [nachricht, setNachricht] = useState("");
 
@@ -76,6 +130,17 @@ export function usePortalAnfrage() {
   const [wurdeGesendet, setWurdeGesendet] = useState(false);
   const [sendError, setSendError] = useState(false);
 
+  /**
+   * Lädt beim ersten Rendern Objekte UND die öffentliche,
+   * gästedatenlose Belegungsliste vom Backend (GET /api/buchungen/oeffentlich
+   * - liefert bewusst NUR Objektname + Zeitraum, siehe
+   * buchungen.routes.js) und baut daraus eine flache
+   * "belegungen"-Liste (ein Eintrag pro belegtem Objekt, also ggf. 2
+   * pro Buchung bei Kombibuchung mit Zusatzobjekt) - exakt dasselbe
+   * Muster wie ladeStammdaten() im internen Buchungs-Assistenten,
+   * nur eben ohne Gast-/Preisdaten, weil die Portal-Seite dafür kein
+   * Recht hat.
+   */
   useEffect(() => {
     async function ladeStammdaten() {
       try {
@@ -121,6 +186,18 @@ export function usePortalAnfrage() {
     ladeStammdaten();
   }, []);
 
+  /**
+   * FullCalendar-Klick-Handler für den Sidebar-Kalender: verzweigt je
+   * nachdem, ob bereits ein Objekt gewählt ist (dann wird nur der
+   * Zeitraum neu gesetzt, mit passender Logik für stundenbasiert vs.
+   * Wohnung) oder ob wir uns noch in der reinen Zeitraum-Auswahl von
+   * Schritt 1 befinden (Start-/Enddatum schrittweise setzen) - exakt
+   * dasselbe Verzweigungsmuster wie handleDateClick im internen
+   * Buchungs-Assistenten.
+   *
+   * @param {{date: Date}} info - FullCalendar dateClick-Event-Info
+   * @returns {void}
+   */
   const handleDateClick = useCallback((info) => {
     const clicked = info.date;
     if (isPastDate(clicked)) return;
@@ -155,6 +232,7 @@ export function usePortalAnfrage() {
     });
   }, [selectedObjekt]);
 
+  /** Setzt die Zeitraumauswahl UND das gewählte Objekt komplett zurück (Kalender "× Auswahl aufheben"). */
   const handleClearSelection = () => {
     setDateRange({ start: null, end: null });
     setSelectedObjekt(null);
@@ -163,11 +241,27 @@ export function usePortalAnfrage() {
   const startISO = dateRange.start ? toISO(dateRange.start) : "";
   const endISO = dateRange.end ? toISO(dateRange.end) : "";
 
+  /** Anzahl der Nächte zwischen Start und Ende (mind. 1, sobald beide Daten gewählt sind). */
   const naechteAnz = useMemo(() => {
     if (!dateRange.start || !dateRange.end) return 0;
     return Math.max(1, Math.round((dateRange.end - dateRange.start) / (1000 * 60 * 60 * 24)));
   }, [dateRange]);
 
+  /**
+   * Prüft, ob ein Objekt im gegebenen Zeitraum (bei stundenbasierten
+   * Objekten optional inkl. Uhrzeit) noch frei ist - zentrale
+   * Verfügbarkeitsprüfung, die von so gut wie jeder anderen
+   * abgeleiteten Größe in diesem Hook genutzt wird (identisches
+   * Muster zu istVerfuegbar() im internen Buchungs-Assistenten, hier
+   * aber auf Basis der gästedatenlosen "belegungen"-Liste).
+   *
+   * @param {string} objektName
+   * @param {string} sISO
+   * @param {string} eISO
+   * @param {string|null} [startZeit] - "HH:MM", nur bei stundenbasierten Objekten relevant
+   * @param {string|null} [endZeit] - "HH:MM"
+   * @returns {boolean}
+   */
   const istVerfuegbar = useCallback(
     (objektName, sISO, eISO, startZeit = null, endZeit = null) => {
       if (!objektName || !sISO || !eISO) return true;
@@ -198,6 +292,7 @@ export function usePortalAnfrage() {
     [belegungen]
   );
 
+  /** Alle Busse, die im gewählten Zeitraum (zu den zentralen Check-in/-out-Zeiten) noch frei sind, günstigster zuerst. */
   const freieZusatzobjekte = useMemo(() => {
     if (!dateRange.start || !dateRange.end) return [];
     const checkin = einstellungen.checkin_zeit || "15:00";
@@ -211,6 +306,7 @@ export function usePortalAnfrage() {
 
   const zusatzobjektVerfuegbar = freieZusatzobjekte.length > 0;
 
+  /** Der tatsächlich vorgeschlagene Zusatz-Bus, falls "Ja" gewählt wurde und einer verfügbar ist. */
   const zugewiesenesZusatzobjekt = useMemo(() => {
     if (bookingDetails.zusatzobjektMieten !== "Ja" || !zusatzobjektVerfuegbar) return null;
     return freieZusatzobjekte[0];
@@ -219,11 +315,20 @@ export function usePortalAnfrage() {
   const istHauptobjektWohnung = istWohnung(selectedObjekt?.name);
   const istHauptobjektStundenbasiert = istStundenbasiert(selectedObjekt?.name);
 
+  /** Gesamtdauer des Hauptobjekts in Stunden, nur relevant bei stundenbasierten Objekten. */
   const stundenHauptobjekt = useMemo(() => {
     if (!istHauptobjektStundenbasiert) return 0;
     return berechneStunden(dateRange.start, zeiten.anreiseZeit, dateRange.end, zeiten.abreiseZeit);
   }, [istHauptobjektStundenbasiert, dateRange.start, dateRange.end, zeiten]);
 
+  /**
+   * Reine Preisanzeige (Hauptobjekt + optional Zusatzobjekt inkl.
+   * Kombirabatt) - dient hier nur zur unverbindlichen Orientierung des
+   * Anfragenden, anders als im internen Buchungs-Assistenten gibt es
+   * auf dieser öffentlichen Seite bewusst KEIN manuelles
+   * Rabatt-/Endpreis-Feld (der finale Preis wird erst beim Annehmen
+   * der Anfrage im Backoffice festgelegt).
+   */
   const gesamtpreisBerechnet = useMemo(() => {
     if (!selectedObjekt || !dateRange.start || !dateRange.end) return 0;
 
@@ -268,14 +373,26 @@ export function usePortalAnfrage() {
     einstellungen.checkout_zeit,
   ]);
 
+  // ─── WOCHENTAGS-PRÜFUNG ───
+  /** Ob das gewählte Anreisedatum dem zentral vorgegebenen Check-in-Wochentag entspricht (immer true ohne Einschränkung). */
   const checkinWochentagPasst = useMemo(() => {
     return entsprichtWochentag(dateRange.start, CHECKIN_WOCHENTAG);
   }, [dateRange.start, CHECKIN_WOCHENTAG]);
 
+  /** Analog zu checkinWochentagPasst, aber für das Abreisedatum. */
   const checkoutWochentagPasst = useMemo(() => {
     return entsprichtWochentag(dateRange.end, CHECKOUT_WOCHENTAG);
   }, [dateRange.end, CHECKOUT_WOCHENTAG]);
 
+  /**
+   * Baut für Schritt 1 die komplette Verfügbarkeitsliste aller
+   * Objekte auf - berücksichtigt je nach Objekt-Typ und
+   * Auswahlzustand unterschiedliche Regeln: Wochentags-Restriktionen
+   * und Mindestaufenthalt bei Wohnungen, Live-Status ohne gewählten
+   * Zeitraum, sowie erlaubte stundenweise Teilbelegung am selben Tag
+   * bei stundenbasierten Objekten (identisches Muster zu
+   * verfuegbareObjekte im internen Buchungs-Assistenten).
+   */
   const verfuegbareObjekte = useMemo(() => {
     const hatStart = dateRange.start !== null;
     const hatEnd = dateRange.end !== null;
@@ -307,6 +424,7 @@ export function usePortalAnfrage() {
         info = `Mindestaufenthalt: ${MINDEST_NAECHTE_WOHNUNG} Nächte`;
         preis = null;
       } else if (!gueltigerZeitraum) {
+        // ZENTRALE LIVE-VERFÜGBARKEIT: berücksichtigt lückenlose Anschlussbuchungen und Tagesanreisen
         const live = berechneLiveVerfuegbarkeit(obj.name, belegungen, einstellungen);
         status = live.status;
         info = live.info;
@@ -334,7 +452,7 @@ export function usePortalAnfrage() {
             info = tagesBelegungen.length > 0
               ? "Für gewählte Uhrzeit verfügbar"
               : "Im gewählten Zeitraum verfügbar";
-            preis = null;
+            preis = null; // <-- IMMER null, damit im 1. Schritt der Stundensatz ("3,00 € / Std.") steht!
           } else if (istMehrtaegig || durchgehendBelegt) {
             status = "nicht verfügbar";
             info = durchgehendBelegt
@@ -371,9 +489,21 @@ export function usePortalAnfrage() {
     einstellungen,
   ]);
 
+  /** Ob die Wohnungs-Mindestaufenthaltsdauer beim aktuell gewählten Zeitraum unterschritten wird. */
   const unterschreitetMindestNaechte =
     istHauptobjektWohnung && naechteAnz < MINDEST_NAECHTE_WOHNUNG;
 
+  /**
+   * Wählt ein Objekt in Schritt 1 aus, passt Start/Ende automatisch an
+   * den Objekttyp an (stundenbasiert -> gleicher Tag, Wohnung ->
+   * mindestens 1 Folgetag) und schlägt bei stundenbasierten Objekten
+   * automatisch die nächste freie Uhrzeit vor, falls die Standardzeit
+   * (09:00-17:00) am gewählten Tag schon belegt ist - identisches
+   * Verhalten zu handleSelectObjekt im internen Buchungs-Assistenten.
+   *
+   * @param {object} obj - Objekt aus verfuegbareObjekte
+   * @returns {void}
+   */
   const handleSelectObjekt = (obj) => {
     setSelectedObjekt(obj);
 
@@ -442,6 +572,7 @@ export function usePortalAnfrage() {
     setWizardStep(2);
   };
 
+  /** Bereits bestehende Belegungen des gewählten Objekts am gewählten Tag (für den Kollisionshinweis). */
   const tagesBuchungen = useMemo(() => {
     if (!selectedObjekt || !dateRange.start || !dateRange.end) return [];
     return belegungen
@@ -452,6 +583,7 @@ export function usePortalAnfrage() {
       .sort((a, b) => (a.anreiseZeit || "00:00").localeCompare(b.anreiseZeit || "00:00"));
   }, [selectedObjekt, startISO, endISO, belegungen]);
 
+  /** Ob das aktuell gewählte Hauptobjekt im gewählten Zeitraum (+ ggf. Uhrzeit) noch verfügbar ist. */
   const selectedObjektVerfuegbar = useMemo(() => {
     if (!selectedObjekt || !dateRange.start || !dateRange.end) return true;
 
@@ -470,6 +602,7 @@ export function usePortalAnfrage() {
     return istVerfuegbar(selectedObjekt.name, startISO, endISO);
   }, [selectedObjekt, dateRange.start, dateRange.end, startISO, endISO, zeiten, istVerfuegbar]);
 
+  /** Menschenlesbarer Warntext bei Terminkollision (fasst bis zu 3 Kollisionen konkret zusammen, sonst pauschal). */
   const kollisionsText = useMemo(() => {
     if (tagesBuchungen.length === 0 || selectedObjektVerfuegbar) return null;
 
@@ -502,10 +635,16 @@ export function usePortalAnfrage() {
     return `⚠ ${objName} ist im gewählten Zeitraum bereits belegt.`;
   }, [tagesBuchungen, selectedObjekt, istHauptobjektStundenbasiert, selectedObjektVerfuegbar]);
 
+  /** Handler für alle einfachen Textfelder im Kontaktformular (Schritt 2). */
   const handleGastChange = (e) => {
     setGastData({ ...gastData, [e.target.name]: e.target.value });
   };
 
+  // Anfrage ist ungültig, wenn: kein Objekt/Zeitraum gewählt, ODER eine
+  // Wohnung den geforderten Checkin-/Checkout-Wochentag nicht einhält,
+  // ODER die Mindestaufenthaltsdauer unterschreitet, ODER das Objekt
+  // kollidiert, ODER bei stundenbasierten Objekten 0 Stunden Dauer
+  // herauskommt, ODER Pflichtfelder im Kontaktformular fehlen.
   const istAnfrageUngueltig =
     !selectedObjekt ||
     !dateRange.start ||
@@ -523,6 +662,16 @@ export function usePortalAnfrage() {
     !gastData.stadt.trim() ||
     !gastData.land.trim();
 
+  /**
+   * Sendet die Anfrage ans Backend (POST /api/anfragen) - anders als
+   * beim internen Buchungs-Assistenten entsteht hier bewusst noch
+   * KEINE Buchung, keine Rechnung und kein Gast-Datensatz im
+   * "echten" Gäste-Stamm; das passiert erst, wenn ein Admin die
+   * Anfrage in Anfragen.jsx annimmt.
+   *
+   * @param {React.FormEvent} [e]
+   * @returns {Promise<void>}
+   */
   const handleSubmitAnfrage = async (e) => {
     if (e) e.preventDefault();
     if (istAnfrageUngueltig) {
@@ -574,6 +723,7 @@ export function usePortalAnfrage() {
     }
   };
 
+  /** Setzt den kompletten Assistenten auf den Ausgangszustand zurück - z.B. nach "Zurück zur Startseite" im Erfolgs-Modal. */
   const handleNeueAnfrage = () => {
     setWizardStep(1);
     setDateRange({ start: null, end: null });

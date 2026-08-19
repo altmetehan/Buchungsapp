@@ -8,7 +8,16 @@ import "../../styles/shared-ui.css";
  * BuchenSchritt1
  * --------------
  * Schritt 1 des Buchungs-Assistenten: Zeitraum & Gästezahl wählen und
- * direkt sehen, welche Objekte dafür verfügbar sind.
+ * direkt sehen, welche Objekte dafür verfügbar sind. Reine Anzeige -
+ * der komplette Zustand kommt aus dem useBuchungsAssistent-Hook ("vm").
+ * Baut zusätzlich lokal (nur für die Anzeige, kein eigener Hook-State)
+ * einen zusammengesetzten Hinweistext für die zentralen
+ * Wohnungs-Regeln (Wochentags-Einschränkung + Mindestaufenthalt)
+ * zusammen, da dieser Text je nach Kombination der Einstellungen
+ * unterschiedlich formuliert werden muss.
+ *
+ * @param {{vm: object}} props - vm = das View-Model aus useBuchungsAssistent()
+ * @returns {JSX.Element}
  */
 export function BuchenSchritt1({ vm }) {
   const [isKalenderModalOpen, setIsKalenderModalOpen] = useState(false);
