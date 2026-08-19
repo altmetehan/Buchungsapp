@@ -11,14 +11,40 @@ import {
 } from "../utils/dateUtils.js";
 import { generiereNaechsteRechnungsnummer } from "../utils/invoiceUtils.js";
 
+/**
+ * anfragen.routes.js
+ * -------------------
+ * CRUD- und Workflow-Endpunkte für Buchungsanfragen (/api/anfragen),
+ * die über die öffentliche Portal-Seite eingehen. Eine Anfrage ist
+ * bewusst von einer echten Buchung getrennt (eigenes Modell
+ * "Anfragen" + "AnfrageGaeste") - erst beim Annehmen wird daraus eine
+ * "echte" Buchung samt Gast, Rechnung und Rechnungsnummer erzeugt.
+ * Ablehnen setzt lediglich den Status samt Begründung, ohne weitere
+ * Nebeneffekte.
+ */
 const router = Router();
 
-// Eine Anfrage verknüpft den Anfragen-Gast (AnfrageGaeste) sowie Haupt- und Zusatzobjekt
+/**
+ * Gemeinsamer "include"-Block für praktisch jede Anfragen-Abfrage:
+ * verknüpft den Anfragen-Gast (AnfrageGaeste) sowie Haupt- und
+ * Zusatzobjekt, damit das Frontend Namen/Preise direkt zur Verfügung
+ * hat, ohne selbst nachzufragen.
+ */
 const MIT_OBJEKTEN_UND_ANFRAGE_GAST = {
   include: { AnfrageGaeste: true, Objekte: true, ObjekteZusatz: true },
 };
 
-/** Berechnet den vorgeschlagenen Gesamtpreis für eine Anfrage */
+/**
+ * Berechnet den vorgeschlagenen Gesamtpreis für eine Anfrage
+ * (Hauptobjekt + optional Zusatzobjekt inkl. Kombirabatt) - dieselbe
+ * Logik wie im Frontend (Anfragen.jsx: berechneVorschlagsPreis), hier
+ * aber serverseitig als verlässliche Grundlage für den finalen Preis
+ * beim Annehmen (PUT /:id/annehmen), falls kein manueller Preis
+ * mitgeschickt wird.
+ *
+ * @param {object} anfrage - Anfrage-Datensatz inkl. Objekte/ObjekteZusatz (siehe MIT_OBJEKTEN_UND_ANFRAGE_GAST)
+ * @returns {Promise<number>} vorgeschlagener Gesamtpreis, gerundet auf 2 Nachkommastellen
+ */
 async function berechneVorschlagsPreisBackend(anfrage) {
   if (!anfrage || !anfrage.anreise || !anfrage.abreise) return 0;
   const anreiseISO = germanToISO(anfrage.anreise);
@@ -57,7 +83,11 @@ async function berechneVorschlagsPreisBackend(anfrage) {
   return Math.round((mainPreis + zusatzPreis) * 100) / 100;
 }
 
-// GET /api/anfragen - Liefert alle Anfragen sortiert nach Erstelldatum
+/**
+ * GET /api/anfragen
+ * Liefert alle Anfragen (offen, angenommen, abgelehnt) sortiert nach
+ * Erstelldatum absteigend, inkl. Gast-, Objekt- und Zusatzobjektdaten.
+ */
 router.get("/", async (req, res) => {
   try {
     const anfragen = await prisma.anfragen.findMany({
@@ -70,7 +100,19 @@ router.get("/", async (req, res) => {
   }
 });
 
-// POST /api/anfragen - Neue Anfrage vom Portal erstellen
+/**
+ * POST /api/anfragen
+ * Legt eine neue Anfrage vom öffentlichen Portal an. Erwartet im Body
+ * Gäste- und Kontaktdaten (name, email, telnr, strasse, hnr, plz,
+ * stadt, land) sowie Objekt/Zeitraum (objekt_id, objekt_id_2,
+ * anreise, abreise, anreise_zeit, abreise_zeit, erwachsene, kinder,
+ * infos).
+ *
+ * Der Anfragen-Gast wird per E-Mail gegen bestehende AnfrageGaeste
+ * gematcht (Update statt Duplikat) - fehlt die E-Mail, wird immer ein
+ * neuer Datensatz angelegt, damit die Unique-Constraint auf "email"
+ * nicht durch mehrere Leerstrings verletzt wird.
+ */
 router.post("/", async (req, res) => {
   try {
     const {
@@ -156,7 +198,21 @@ router.post("/", async (req, res) => {
   }
 });
 
-// PUT /api/anfragen/:id/annehmen - Anfrage annehmen, Gast & Buchung & Rechnung anlegen
+/**
+ * PUT /api/anfragen/:id/annehmen
+ * Nimmt eine offene Anfrage an: prüft die Verfügbarkeit von Haupt-
+ * (und ggf. Zusatz-) Objekt erneut gegen den aktuellen Buchungsstand
+ * (kann sich seit dem Anfragezeitpunkt geändert haben), legt/aktualisiert
+ * den Gast, erstellt daraus eine Buchung samt automatisch generierter
+ * Rechnung und markiert die Anfrage als "angenommen".
+ *
+ * Erwartet optional im Body: preis (überschreibt den automatischen
+ * Vorschlagspreis).
+ *
+ * Gast-Anlage, Rechnungsnummer-Vergabe, Buchung und Statuswechsel
+ * laufen in EINER Transaktion, damit bei einem Fehler mittendrin
+ * keine "halbe" Buchung ohne Rechnung (oder umgekehrt) übrig bleibt.
+ */
 router.put("/:id/annehmen", async (req, res) => {
   try {
     const anfrageId = Number(req.params.id);
@@ -188,6 +244,15 @@ router.put("/:id/annehmen", async (req, res) => {
       if (b.ObjekteZusatz) belegungen.push({ objekt: b.ObjekteZusatz, start, end, anreiseZeit: b.anreise_zeit, abreiseZeit: b.abreise_zeit });
     });
 
+    /**
+     * Prüft, ob ein einzelnes Objekt (Haupt- oder Zusatzobjekt) im
+     * Zeitraum der Anfrage noch frei ist - berücksichtigt bei
+     * stundenbasierten Objekten die genaue Uhrzeit, bei Wohnungen nur
+     * das Datum.
+     *
+     * @param {{name: string}|null} objekt
+     * @returns {boolean}
+     */
     const pruefeObjekt = (objekt) => {
       if (!objekt) return true;
       const stunden = istStundenbasiert(objekt);
@@ -308,7 +373,12 @@ router.put("/:id/annehmen", async (req, res) => {
   }
 });
 
-// PUT /api/anfragen/:id/ablehnen - Anfrage mit Begründung ablehnen
+/**
+ * PUT /api/anfragen/:id/ablehnen
+ * Lehnt eine offene Anfrage mit Pflicht-Begründung ab (setzt Status,
+ * Ablehnungszeitpunkt und -grund) - erzeugt bewusst keine Buchung
+ * oder sonstige Nebeneffekte.
+ */
 router.put("/:id/ablehnen", async (req, res) => {
   try {
     const { grund } = req.body;

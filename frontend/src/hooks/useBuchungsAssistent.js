@@ -22,6 +22,21 @@ import {
 import { useEinstellungen } from "./useEinstellungen";
 import { useToast } from "./useToast";
 
+/**
+ * useBuchungsAssistent.js
+ * ------------------------
+ * Zentrales "View-Model" für den internen Buchungs-Assistenten
+ * (Seite Buchen.jsx + BuchenSchritt1/2/3). Bündelt sämtlichen Zustand
+ * (gewählter Zeitraum, Objekt, Gästedaten, Preisberechnung,
+ * Verfügbarkeitsprüfung) und die komplette Geschäftslogik an einer
+ * Stelle - die Schritt-Komponenten selbst sind reine Anzeige und
+ * greifen nur auf das hier zurückgegebene "vm"-Objekt zu.
+ *
+ * Pendant für die öffentliche Portal-Seite: usePortalAnfrage.js (sehr
+ * ähnlicher Aufbau, aber ohne internen Rabatt/Endpreis-Feinschliff und
+ * mit Anfragen- statt Buchungs-Semantik).
+ */
+
 const OBJEKTE_API = "/api/objekte";
 const BUCHUNGEN_API = "/api/buchungen";
 const GAESTE_API = "/api/gaeste";
@@ -30,6 +45,17 @@ const RECHNUNGEN_API = "/api/rechnungen";
 const STANDARD_ANREISE_ZEIT = "09:00";
 const STANDARD_ABREISE_ZEIT = "17:00";
 
+/**
+ * Berechnet die Dauer zwischen zwei Datum+Uhrzeit-Punkten in Stunden.
+ * Wird für die Preisberechnung stundenbasierter Objekte (Bus, Forum)
+ * gebraucht.
+ *
+ * @param {Date|string} startDatum
+ * @param {string} startZeit - "HH:MM"
+ * @param {Date|string} endDatum
+ * @param {string} endZeit - "HH:MM"
+ * @returns {number} Stunden als Dezimalzahl, 0 falls Eingaben fehlen oder das Ende vor dem Start liegt
+ */
 const berechneStunden = (startDatum, startZeit, endDatum, endZeit) => {
   if (!startDatum || !endDatum || !startZeit || !endZeit) return 0;
   const [sh, sm] = startZeit.split(":").map(Number);
@@ -44,6 +70,26 @@ const berechneStunden = (startDatum, startZeit, endDatum, endZeit) => {
   return diffMs > 0 ? diffMs / (1000 * 60 * 60) : 0;
 };
 
+/**
+ * useBuchungsAssistent
+ * --------------------
+ * Lädt Objekt-, Buchungs- und Gästestammdaten vom Backend und stellt
+ * den kompletten 3-Schritte-Buchungs-Wizard (Zeitraum & Objekt wählen
+ * -> Gästedaten -> Details/Preis/Abschluss) als ein einziges
+ * View-Model bereit.
+ *
+ * @returns {object} vm - enthält u.a.:
+ *   - wizardStep, setWizardStep: aktueller Schritt (2 oder 3) innerhalb einer neuen Buchung
+ *   - dateRange, handleDateClick, handleClearSelection: Zeitraumauswahl
+ *   - objektStammdaten, verfuegbareObjekte, istVerfuegbar: Objekt-Verfügbarkeit
+ *   - selectedObjekt, handleSelectObjekt, selectedObjektVerfuegbar: gewähltes Objekt
+ *   - guestData, handleGuestChange, gastVorschlaege, handleSelectGuestSuggestion: Gästedaten inkl. Autofill
+ *   - zeiten, stundenHauptobjekt: Uhrzeiten & Dauer bei stundenbasierten Objekten
+ *   - zusatzobjektVerfuegbar, zugewiesenesZusatzobjekt: optionaler Zusatz-Bus
+ *   - gesamtpreisBerechnet, rabattProzent, endpreisManuell, effektiverEndpreis: Preislogik
+ *   - istBuchungUngueltig, handleFinalizeBooking: Validierung & Speichern
+ *   - toast, dismissToast, angenommeneBuchungErfolg, resetAssistent: Erfolgs-/Fehler-Feedback
+ */
 export function useBuchungsAssistent() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -97,6 +143,11 @@ export function useBuchungsAssistent() {
   const [isGuestSuggestOpen, setIsGuestSuggestOpen] = useState(false);
   const guestSuggestRef = useRef(null);
 
+  /**
+   * Bis zu 5 Namensvorschläge aus der bestehenden Gästeliste, sobald
+   * mindestens 2 Zeichen im Namensfeld eingegeben wurden (Autofill für
+   * wiederkehrende Gäste in Schritt 2).
+   */
   const gastVorschlaege = useMemo(() => {
     const query = guestData.name.trim().toLowerCase();
     if (query.length < 2) return [];
@@ -119,6 +170,7 @@ export function useBuchungsAssistent() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isGuestSuggestOpen]);
 
+  /** Handler für alle einfachen Textfelder im Gästeformular (Schritt 2). */
   const handleGuestChange = (e) => {
     const { name, value } = e.target;
     setGuestData((prev) => ({ ...prev, [name]: value }));
@@ -128,6 +180,7 @@ export function useBuchungsAssistent() {
     }
   };
 
+  /** Übernimmt einen Gast-Vorschlag aus der Autofill-Liste ins Formular. */
   const handleSelectGuestSuggestion = (gast) => {
     setGuestData({
       name: gast.name || "",
@@ -156,6 +209,16 @@ export function useBuchungsAssistent() {
 
   const { toast, showToast, dismissToast } = useToast();
 
+  /**
+   * Lädt Objekte, Buchungen und Gäste parallel vom Backend und baut
+   * daraus die flache "bestehendeBuchungen"-Belegungsliste
+   * (ein Eintrag pro belegtem Objekt, also ggf. 2 pro Buchung bei
+   * Kombibuchung mit Zusatzobjekt). Wird initial UND nach jeder
+   * erfolgreichen Buchung erneut aufgerufen, um die Verfügbarkeit
+   * aktuell zu halten.
+   *
+   * @returns {Promise<void>}
+   */
   const ladeStammdaten = async () => {
     try {
       const [objekteRes, buchungenRes, gaesteRes] = await Promise.all([
@@ -210,13 +273,27 @@ export function useBuchungsAssistent() {
     initialLaden();
   }, []);
 
+  // Schützt die Route "/buchen/neu": ohne gewähltes Objekt (z.B. nach
+  // einem Reload mitten in Schritt 2/3) zurück auf die Übersicht.
   useEffect(() => {
     if (istNeueBuchungRoute && !selectedObjekt && objektStammdaten.length > 0) {
       navigate("/buchen", { replace: true });
     }
   }, [istNeueBuchungRoute, selectedObjekt, navigate, objektStammdaten]);
 
-  // ─── VERFÜGBARKEITSPRÜFUNG ───
+  /**
+   * Prüft, ob ein Objekt im gegebenen Zeitraum (bei stundenbasierten
+   * Objekten optional inkl. Uhrzeit) noch frei ist - zentrale
+   * Verfügbarkeitsprüfung, die von so gut wie jeder anderen
+   * abgeleiteten Größe in diesem Hook genutzt wird.
+   *
+   * @param {string} objektName
+   * @param {string} startISO
+   * @param {string} endISO
+   * @param {string|null} [startZeit] - "HH:MM", nur bei stundenbasierten Objekten relevant
+   * @param {string|null} [endZeit] - "HH:MM"
+   * @returns {boolean}
+   */
   const istVerfuegbar = (objektName, startISO, endISO, startZeit = null, endZeit = null) => {
     const stundenbasiert = istStundenbasiert(objektName);
 
@@ -244,6 +321,7 @@ export function useBuchungsAssistent() {
     });
   };
 
+  /** Ob das aktuell gewählte Hauptobjekt im gewählten Zeitraum (+ ggf. Uhrzeit) noch verfügbar ist. */
   const selectedObjektVerfuegbar = useMemo(() => {
     // Wenn das Erfolgs-Modal offen ist, Verfügbarkeitswarnung im Hintergrund unterdrücken
     if (angenommeneBuchungErfolg !== null) return true;
@@ -279,7 +357,7 @@ export function useBuchungsAssistent() {
     angenommeneBuchungErfolg,
   ]);
 
-  // ─── GEBUCHTE UHRZEITEN AM GEWÄHLTEN TAG ERFASSEN ───
+  /** Bereits bestehende Buchungen des gewählten Objekts am gewählten Tag (für den Kollisionshinweis). */
   const tagesBuchungen = useMemo(() => {
     if (!selectedObjekt || !dateRange.start || !dateRange.end) return [];
     return bestehendeBuchungen
@@ -290,7 +368,7 @@ export function useBuchungsAssistent() {
       .sort((a, b) => (a.anreiseZeit || "00:00").localeCompare(b.anreiseZeit || "00:00"));
   }, [selectedObjekt, startISO, endISO, bestehendeBuchungen]);
 
-  // ─── KOLLISIONSTEXT ───
+  /** Menschenlesbarer Warntext bei Terminkollision (fasst bis zu 3 Kollisionen konkret zusammen, sonst pauschal). */
   const kollisionsText = useMemo(() => {
     // Wenn das Erfolgs-Modal angezeigt wird, soll kein Kollisionshinweis erscheinen
     if (angenommeneBuchungErfolg !== null || tagesBuchungen.length === 0 || selectedObjektVerfuegbar) return null;
@@ -325,11 +403,13 @@ export function useBuchungsAssistent() {
     return `⚠ ${objName} ist im gewählten Zeitraum bereits belegt.`;
   }, [tagesBuchungen, selectedObjekt, istHauptobjektStundenbasiert, selectedObjektVerfuegbar, angenommeneBuchungErfolg]);
 
+  /** Gesamtdauer des Hauptobjekts in Stunden, nur relevant bei stundenbasierten Objekten. */
   const stundenHauptobjekt = useMemo(() => {
     if (!istHauptobjektStundenbasiert) return 0;
     return berechneStunden(dateRange.start, zeiten.anreiseZeit, dateRange.end, zeiten.abreiseZeit);
   }, [istHauptobjektStundenbasiert, dateRange.start, dateRange.end, zeiten]);
 
+  /** Alle Busse, die im gewählten Zeitraum (zu den zentralen Check-in/-out-Zeiten) noch frei sind, günstigster zuerst. */
   const freieZusatzobjekte = useMemo(() => {
     if (!dateRange.start || !dateRange.end) return [];
     const checkin = einstellungen.checkin_zeit || "15:00";
@@ -343,12 +423,13 @@ export function useBuchungsAssistent() {
 
   const zusatzobjektVerfuegbar = freieZusatzobjekte.length > 0;
 
+  /** Der tatsächlich dem Gast zugewiesene Zusatz-Bus, falls "Ja" gewählt wurde und einer verfügbar ist. */
   const zugewiesenesZusatzobjekt = useMemo(() => {
     if (bookingDetails.zusatzobjektMieten !== "Ja" || !zusatzobjektVerfuegbar) return null;
     return freieZusatzobjekte[0];
   }, [bookingDetails.zusatzobjektMieten, zusatzobjektVerfuegbar, freieZusatzobjekte]);
 
-  // ─── BERECHNETER PREIS ───
+  /** Automatisch berechneter Gesamtpreis (Hauptobjekt + optional Zusatzobjekt inkl. Kombirabatt), vor manuellem Rabatt. */
   const gesamtpreisBerechnet = useMemo(() => {
     if (!selectedObjekt || !dateRange.start || !dateRange.end) return 0;
 
@@ -386,7 +467,7 @@ export function useBuchungsAssistent() {
     einstellungen.checkout_zeit,
   ]);
 
-  // ─── HANDLER FÜR RABATT & ENDPREIS ───
+  /** Rabatt-Prozent-Feld geändert -> Endpreis proportional neu berechnen. */
   const handleRabattChange = (e) => {
     const rawVal = e.target.value;
     if (rawVal === "") {
@@ -405,6 +486,7 @@ export function useBuchungsAssistent() {
     setEndpreisManuell(neuerEndpreis.toFixed(2));
   };
 
+  /** Endpreis-Feld manuell geändert -> passenden Rabatt-Prozentsatz zurückrechnen (umgekehrte Richtung zu handleRabattChange). */
   const handleEndpreisChange = (e) => {
     const rawVal = e.target.value;
     setEndpreisManuell(rawVal);
@@ -424,27 +506,40 @@ export function useBuchungsAssistent() {
     }
   };
 
+  // Hält den Endpreis synchron, sobald sich der automatisch berechnete
+  // Grundpreis ändert (z.B. weil Zeitraum/Objekt/Zusatzobjekt
+  // gewechselt wurde), ohne den aktuell gesetzten Rabatt zu verlieren.
   useEffect(() => {
     const rabatt = parseFloat(rabattProzent?.toString().replace(",", ".")) || 0;
     const berechnet = gesamtpreisBerechnet * (1 - rabatt / 100);
     setEndpreisManuell(berechnet.toFixed(2));
   }, [gesamtpreisBerechnet, rabattProzent]);
 
+  /** Der tatsächlich zu zahlende Endpreis (manuelles Feld hat Vorrang, mit Fallback auf den berechneten Preis). */
   const effektiverEndpreis = useMemo(() => {
     const p = parseFloat(endpreisManuell?.toString().replace(",", "."));
     return !isNaN(p) ? p : gesamtpreisBerechnet;
   }, [endpreisManuell, gesamtpreisBerechnet]);
 
   // ─── WOCHENTAGS-PRÜFUNG ───
+  /** Ob das gewählte Anreisedatum dem zentral vorgegebenen Check-in-Wochentag entspricht (immer true ohne Einschränkung). */
   const checkinWochentagPasst = useMemo(() => {
     return entsprichtWochentag(dateRange.start, CHECKIN_WOCHENTAG);
   }, [dateRange.start, CHECKIN_WOCHENTAG]);
 
+  /** Analog zu checkinWochentagPasst, aber für das Abreisedatum. */
   const checkoutWochentagPasst = useMemo(() => {
     return entsprichtWochentag(dateRange.end, CHECKOUT_WOCHENTAG);
   }, [dateRange.end, CHECKOUT_WOCHENTAG]);
 
-  // ─── VERFÜGBARE OBJEKTE FÜR SCHRITT 1 (erlaubt stundenbasierte Teilbelegung am selben Tag) ───
+  /**
+   * Baut für Schritt 1 die komplette Verfügbarkeitsliste aller
+   * Objekte auf - berücksichtigt je nach Objekt-Typ und
+   * Auswahlzustand unterschiedliche Regeln: Wochentags-Restriktionen
+   * und Mindestaufenthalt bei Wohnungen, Live-Status ohne gewählten
+   * Zeitraum, sowie erlaubte stundenweise Teilbelegung am selben Tag
+   * bei stundenbasierten Objekten.
+   */
   const verfuegbareObjekte = useMemo(() => {
     return objektStammdaten.map((obj) => {
       const hatStart = dateRange.start !== null;
@@ -550,9 +645,16 @@ export function useBuchungsAssistent() {
     (!istHauptobjektStundenbasiert && naechteAnz < MINDEST_NAECHTE_WOHNUNG) ||
     (istHauptobjektStundenbasiert && stundenHauptobjekt <= 0);
 
-  // Wählt ein Objekt in Schritt 1 aus und schlägt bei stundenbasierten
-  // Objekten automatisch die nächste freie Uhrzeit vor, falls die
-  // Standardzeit (09:00-17:00) am gewählten Tag schon belegt ist.
+  /**
+   * Wählt ein Objekt in Schritt 1 aus, passt Start/Ende automatisch an
+   * den Objekttyp an (stundenbasiert -> gleicher Tag, Wohnung ->
+   * mindestens 1 Folgetag) und schlägt bei stundenbasierten Objekten
+   * automatisch die nächste freie Uhrzeit vor, falls die Standardzeit
+   * (09:00-17:00) am gewählten Tag schon belegt ist.
+   *
+   * @param {object} obj - Objekt aus verfuegbareObjekte
+   * @returns {void}
+   */
   const handleSelectObjekt = (obj) => {
     setSelectedObjekt(obj);
 
@@ -625,7 +727,13 @@ export function useBuchungsAssistent() {
     navigate("/buchen/neu");
   };
 
-  /** Speichert Gast (neu oder aktualisiert) und die Buchung, erstellt automatisch die Rechnung und setzt den Assistenten zurück. */
+  /**
+   * Speichert Gast (neu oder aktualisiert) und die Buchung, erstellt
+   * automatisch die Rechnung und setzt den Assistenten anschließend in
+   * den Erfolgs-Zustand (angenommeneBuchungErfolg).
+   *
+   * @returns {Promise<void>}
+   */
   const handleFinalizeBooking = async () => {
     setIsSaving(true);
     try {
@@ -745,6 +853,16 @@ export function useBuchungsAssistent() {
     }
   };
 
+  /**
+   * FullCalendar-Klick-Handler für den Sidebar-Kalender: verzweigt je
+   * nachdem, ob bereits ein Objekt gewählt ist (dann wird nur der
+   * Zeitraum neu gesetzt, mit passender Logik für stundenbasiert vs.
+   * Wohnung) oder ob wir uns noch in der reinen Zeitraum-Auswahl von
+   * Schritt 1 befinden (Start-/Enddatum schrittweise setzen).
+   *
+   * @param {{date: Date}} info - FullCalendar dateClick-Event-Info
+   * @returns {void}
+   */
   const handleDateClick = (info) => {
     const clickedDate = info.date;
     if (isPastDate(clickedDate)) return;
@@ -790,11 +908,13 @@ export function useBuchungsAssistent() {
     }
   };
 
+  /** Setzt die Zeitraumauswahl komplett zurück (Kalender "× Auswahl aufheben"). */
   const handleClearSelection = () => {
     setDateRange({ start: null, end: null });
     setHoveredDate(null);
   };
 
+  /** Setzt den kompletten Assistenten auf den Ausgangszustand zurück und navigiert zur Übersicht - z.B. nach "Fertig/Schließen" im Erfolgs-Modal. */
   const resetAssistent = () => {
     setWizardStep(2);
     setSelectedObjekt(null);
