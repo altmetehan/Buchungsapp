@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { Routes, Route, NavLink, Navigate } from "react-router-dom";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Routes, Route, NavLink, Navigate, useNavigate } from "react-router-dom";
 import { useWebSocket } from "./hooks/useWebSocket";
 
 import "./styles/reset.css";
@@ -16,6 +16,7 @@ import { Rechnungen } from "./pages/Rechnungen";
 import { Objekte } from "./pages/Objekte";
 import { Einstellungen } from "./pages/Einstellungen";
 import { Anfragen } from "./pages/Anfragen";
+import Login from "./pages/Login";
 
 const ANFRAGEN_API = "/api/anfragen";
 
@@ -54,6 +55,29 @@ export function AdminApp() {
   );
   const [offeneAnfragenAnzahl, setOffeneAnfragenAnzahl] = useState(0);
 
+  /**
+   * Steuert die Sichtbarkeit des Profil-Flyouts oberhalb des Benutzernamens.
+   * @type {[boolean, Function]}
+   */
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useRef(null);
+
+  // Schließt das Menü beim Klick außerhalb
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const navigate = useNavigate();
+
   // Anzahl offener Anfragen laden
   const ladeOffeneAnfragenCount = useCallback(async () => {
     try {
@@ -73,6 +97,14 @@ export function AdminApp() {
 
   // Live-Aktualisierung über WebSocket bei Anfragen-Änderungen
   useWebSocket("anfragen:changed", ladeOffeneAnfragenCount);
+
+  /**
+   * Führt den Logout aus und leitet den Nutzer zum öffentlichen Portal weiter.
+   */
+  const handleLogout = () => {
+    setIsUserMenuOpen(false);
+    navigate("/portal");
+  };
 
   return (
     <div className="app-container">
@@ -174,21 +206,40 @@ export function AdminApp() {
             <span className="bullet-dot">⚙</span>
             Einstellungen
           </NavLink>
-          <NavLink
-            to="/portal"
-            className="nav-button"
-            style={{
-              marginTop: "6px",
-              fontWeight: "600",
-              color: "#2563eb",
-            }}
-            onClick={() => {
-              if (window.innerWidth <= 1200) setIsCollapsed(true);
-            }}
-          >
-            <span className="bullet-dot">🌐</span>
-            Zur Gäste-Ansicht
-          </NavLink>
+
+          {/* Eingeloggter Benutzer mit Aufklappfeld nach oben */}
+          <div className="sidebar-user-wrapper" ref={userMenuRef}>
+            {isUserMenuOpen && (
+              <div className="sidebar-user-popover">
+                <div className="sidebar-user-popover-info">
+                  <div className="popover-name">Administrator</div>
+                  <div className="popover-email">admin@system.local</div>
+                </div>
+                <div className="popover-divider" />
+                <button
+                  type="button"
+                  className="popover-logout-btn"
+                  onClick={handleLogout}
+                >
+                  <span>Abmelden</span>
+                </button>
+              </div>
+            )}
+
+            <button
+              type="button"
+              className={`sidebar-user-button ${isUserMenuOpen ? "active" : ""}`}
+              onClick={() => setIsUserMenuOpen((prev) => !prev)}
+              title="Benutzerprofil anzeigen"
+            >
+              <div className="sidebar-user-avatar">M</div>
+              {!isCollapsed && (
+                <div className="sidebar-user-meta">
+                  <span className="sidebar-user-name">Metehan</span>
+                </div>
+              )}
+            </button>
+          </div>
         </div>
       </aside>
 

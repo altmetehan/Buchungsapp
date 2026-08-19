@@ -15,6 +15,8 @@ import {
   entsprichtWochentag,
   getWochentagName,
   berechneLiveVerfuegbarkeit,
+  ermittleFreieStundenSlots,
+  findeBestenFreienSlot,
 } from "../utils/javaUtils";
 import { useEinstellungen } from "./useEinstellungen";
 import { useToast } from "./useToast";
@@ -199,38 +201,25 @@ export function usePortalAnfrage() {
    * @returns {void}
    */
   const handleDateClick = useCallback((info) => {
-    const clicked = info.date;
-    if (isPastDate(clicked)) return;
-
-    if (selectedObjekt) {
-      if (istStundenbasiert(selectedObjekt.name)) {
-        setDateRange({ start: clicked, end: clicked });
-        setHoveredDate(null);
-        return;
-      } else {
-        setDateRange((prev) => {
-          if (!prev.start || (prev.start && prev.end)) {
-            const nextDay = new Date(clicked);
-            nextDay.setDate(nextDay.getDate() + 1);
-            return { start: clicked, end: nextDay };
-          }
-          if (clicked <= prev.start) {
-            const nextDay = new Date(clicked);
-            nextDay.setDate(nextDay.getDate() + 1);
-            return { start: clicked, end: nextDay };
-          }
-          return { start: prev.start, end: clicked };
-        });
-        return;
-      }
-    }
+    const clickedDate = info.date;
+    if (isPastDate(clickedDate)) return;
 
     setDateRange((prev) => {
-      if (!prev.start || (prev.start && prev.end)) return { start: clicked, end: null };
-      if (clicked < prev.start) return { start: clicked, end: prev.start };
-      return { start: prev.start, end: clicked };
+      if (prev.start && !prev.end) {
+        if (clickedDate < prev.start) {
+          // Klick liegt vor der Anreise -> Anreise auf diesen Tag umsetzen
+          return { start: clickedDate, end: null };
+        } else {
+          // 2. Klick: Abreisedatum setzen
+          return { start: prev.start, end: clickedDate };
+        }
+      } else {
+        // 1. Klick: Neues Anreisedatum wählen, Abreise leeren
+        return { start: clickedDate, end: null };
+      }
     });
-  }, [selectedObjekt]);
+    setHoveredDate(null);
+  }, []);
 
   /** Setzt die Zeitraumauswahl UND das gewählte Objekt komplett zurück (Kalender "× Auswahl aufheben"). */
   const handleClearSelection = () => {
@@ -431,37 +420,42 @@ export function usePortalAnfrage() {
         preis = null;
       } else {
         if (stundenbasiert) {
-          const tagesBelegungen = belegungen.filter(
-            (b) => (b.name || b.resource)?.toLowerCase() === obj.name?.toLowerCase() && b.start <= endISO && b.end >= startISO
-          );
-
-          const verfuegbarFuerUhrzeit = istVerfuegbar(
-            obj.name,
-            startISO,
-            endISO,
-            STANDARD_ANREISE_ZEIT,
-            STANDARD_ABREISE_ZEIT
-          );
-          const durchgehendBelegt = tagesBelegungen.some(
-            (b) => (b.anreiseZeit === "00:00" && b.abreiseZeit === "23:59") || !b.anreiseZeit || (b.start < startISO && b.end > endISO)
-          );
           const istMehrtaegig = startISO !== endISO;
 
-          if (verfuegbarFuerUhrzeit) {
-            status = "verfügbar";
-            info = tagesBelegungen.length > 0
-              ? "Für gewählte Uhrzeit verfügbar"
-              : "Im gewählten Zeitraum verfügbar";
-            preis = null; // <-- IMMER null, damit im 1. Schritt der Stundensatz ("3,00 € / Std.") steht!
-          } else if (istMehrtaegig || durchgehendBelegt) {
-            status = "nicht verfügbar";
-            info = durchgehendBelegt
-              ? "Im gewählten Zeitraum ganztägig belegt"
-              : "Im gewählten Zeitraum belegt";
-            preis = null;
+          if (!istMehrtaegig) {
+            const freieSlots = ermittleFreieStundenSlots(obj.name, startISO, belegungen, 60, "06:00", "22:00");
+            const hatSlot = freieSlots.length > 0;
+
+            if (hatSlot) {
+              status = "verfügbar";
+              const standardFrei = istVerfuegbar(
+                obj.name,
+                startISO,
+                endISO,
+                STANDARD_ANREISE_ZEIT,
+                STANDARD_ABREISE_ZEIT
+              );
+              if (standardFrei) {
+                const tagesBelegungen = belegungen.filter(
+                  (b) => (b.name || b.resource)?.toLowerCase() === obj.name?.toLowerCase() && b.start <= endISO && b.end >= startISO
+                );
+                info = tagesBelegungen.length > 0
+                  ? "Für gewählte Uhrzeit verfügbar"
+                  : "Im gewählten Zeitraum verfügbar";
+              } else {
+                const ersterSlot = freieSlots[0];
+                info = `Teilweise belegt (z. B. ${ersterSlot.startStr}–${ersterSlot.endStr} frei)`;
+              }
+              preis = null;
+            } else {
+              status = "nicht verfügbar";
+              info = "Im gewählten Zeitraum belegt";
+              preis = null;
+            }
           } else {
-            status = "verfügbar";
-            info = "Teilweise belegt (Uhrzeit in Schritt 2 anpassbar)";
+            const verfuegbar = istVerfuegbar(obj.name, startISO, endISO, STANDARD_ANREISE_ZEIT, STANDARD_ABREISE_ZEIT);
+            status = verfuegbar ? "verfügbar" : "nicht verfügbar";
+            info = verfuegbar ? "Im gewählten Zeitraum verfügbar" : "Im gewählten Zeitraum belegt";
             preis = null;
           }
         } else {
@@ -524,48 +518,23 @@ export function usePortalAnfrage() {
       }
     }
 
-    const sISO = toISO(start);
-    const eISO = toISO(end);
+    const aktuellesStartISO = toISO(start);
 
-    if (istStundenbasiert(obj.name) && start && end) {
-      const istStandardFrei = istVerfuegbar(
+    if (istStundenbasiert(obj.name) && start) {
+      const besterSlot = findeBestenFreienSlot(
         obj.name,
-        sISO,
-        eISO,
+        aktuellesStartISO,
+        belegungen,
         STANDARD_ANREISE_ZEIT,
-        STANDARD_ABREISE_ZEIT
+        STANDARD_ABREISE_ZEIT,
+        "06:00",
+        "22:00"
       );
 
-      if (istStandardFrei) {
-        setZeiten({ anreiseZeit: STANDARD_ANREISE_ZEIT, abreiseZeit: STANDARD_ABREISE_ZEIT });
+      if (besterSlot) {
+        setZeiten({ anreiseZeit: besterSlot.anreiseZeit, abreiseZeit: besterSlot.abreiseZeit });
       } else {
-        const tagesBelegungen = belegungen.filter(
-          (b) => b.name?.toLowerCase() === obj.name?.toLowerCase() && b.start <= eISO && b.end >= sISO
-        );
-
-        let neueZeitGefunden = false;
-
-        if (tagesBelegungen.length > 0) {
-          const sortiert = [...tagesBelegungen].sort((a, b) =>
-            (b.abreiseZeit || "23:59").localeCompare(a.abreiseZeit || "23:59")
-          );
-          const naechsteFreieZeit = sortiert[0].abreiseZeit;
-
-          if (naechsteFreieZeit && naechsteFreieZeit < "22:00") {
-            const [h, m] = naechsteFreieZeit.split(":").map(Number);
-            const endH = Math.min(23, h + 4);
-            const endZeitStr = `${String(endH).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-
-            if (istVerfuegbar(obj.name, sISO, eISO, naechsteFreieZeit, endZeitStr)) {
-              setZeiten({ anreiseZeit: naechsteFreieZeit, abreiseZeit: endZeitStr });
-              neueZeitGefunden = true;
-            }
-          }
-        }
-
-        if (!neueZeitGefunden) {
-          setZeiten({ anreiseZeit: STANDARD_ANREISE_ZEIT, abreiseZeit: STANDARD_ABREISE_ZEIT });
-        }
+        setZeiten({ anreiseZeit: STANDARD_ANREISE_ZEIT, abreiseZeit: STANDARD_ABREISE_ZEIT });
       }
     }
 

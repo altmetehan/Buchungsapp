@@ -127,7 +127,7 @@ export function DashboardKategorieSektion({
             } else if (tage === 1) {
               dateDisplay = `morgen (${arrival.arrivalDate})`;
             } else if (tage > 1) {
-              dateDisplay = `noch ${tage} Tage (${arrival.arrivalDate})`;
+              dateDisplay = `in ${tage} Tagen (${arrival.arrivalDate})`;
             }
           }
 

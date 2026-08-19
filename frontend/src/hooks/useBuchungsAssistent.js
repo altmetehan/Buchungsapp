@@ -18,6 +18,8 @@ import {
   entsprichtWochentag,
   getWochentagName,
   berechneLiveVerfuegbarkeit,
+  ermittleFreieStundenSlots,
+  findeBestenFreienSlot,
 } from "../utils/javaUtils";
 import { useEinstellungen } from "./useEinstellungen";
 import { useToast } from "./useToast";
@@ -576,46 +578,52 @@ export function useBuchungsAssistent() {
         status = live.status;
         info = live.info;
       } else {
-        if (stundenbasiert) {
-          const tagesBelegungen = bestehendeBuchungen.filter(
-            (b) => b.resource?.toLowerCase() === obj.name?.toLowerCase() && b.start <= endISO && b.end >= startISO
-          );
+          if (stundenbasiert) {
+            const istMehrtaegig = startISO !== endISO;
 
-          const verfuegbarFuerUhrzeit = istVerfuegbar(
-            obj.name,
-            startISO,
-            endISO,
-            STANDARD_ANREISE_ZEIT,
-            STANDARD_ABREISE_ZEIT
-          );
-          const durchgehendBelegt = tagesBelegungen.some(
-            (b) => (b.anreiseZeit === "00:00" && b.abreiseZeit === "23:59") || !b.anreiseZeit || (b.start < startISO && b.end > endISO)
-          );
-          const istMehrtaegig = startISO !== endISO;
+            if (!istMehrtaegig) {
+              // Prüft, ob zwischen 06:00 und 22:00 mindestens 1 Stunde frei ist
+              const freieSlots = ermittleFreieStundenSlots(obj.name, startISO, bestehendeBuchungen, 60, "06:00", "22:00");
+              const hatSlot = freieSlots.length > 0;
 
-          if (verfuegbarFuerUhrzeit) {
-            status = "verfügbar";
-            info = tagesBelegungen.length > 0
-              ? "Für gewählte Uhrzeit verfügbar"
-              : "Im gewählten Zeitraum verfügbar";
-            preis = null; // <-- IMMER null, damit im 1. Schritt der Stundensatz ("3,00 € / Std.") steht!
-          } else if (istMehrtaegig || durchgehendBelegt) {
-            status = "nicht verfügbar";
-            info = durchgehendBelegt
-              ? "Im gewählten Zeitraum ganztägig belegt"
-              : "Im gewählten Zeitraum belegt";
-            preis = null;
+              if (hatSlot) {
+                status = "verfügbar";
+                const standardFrei = istVerfuegbar(
+                  obj.name,
+                  startISO,
+                  endISO,
+                  STANDARD_ANREISE_ZEIT,
+                  STANDARD_ABREISE_ZEIT
+                );
+                if (standardFrei) {
+                  const tagesBelegungen = bestehendeBuchungen.filter(
+                    (b) => b.resource?.toLowerCase() === obj.name?.toLowerCase() && b.start <= endISO && b.end >= startISO
+                  );
+                  info = tagesBelegungen.length > 0
+                    ? "Für Standardzeit (09:00–17:00) verfügbar"
+                    : "Im gewählten Zeitraum verfügbar";
+                } else {
+                  const ersterSlot = freieSlots[0];
+                  info = `Teilweise belegt (z. B. ${ersterSlot.startStr}–${ersterSlot.endStr} frei)`;
+                }
+                preis = null;
+              } else {
+                status = "nicht verfügbar";
+                info = "Im gewählten Zeitraum belegt";
+                preis = null;
+              }
+            } else {
+              const verfuegbar = istVerfuegbar(obj.name, startISO, endISO, STANDARD_ANREISE_ZEIT, STANDARD_ABREISE_ZEIT);
+              status = verfuegbar ? "verfügbar" : "nicht verfügbar";
+              info = verfuegbar ? "Im gewählten Zeitraum verfügbar" : "Im gewählten Zeitraum belegt";
+              preis = null;
+            }
           } else {
-            status = "verfügbar";
-            info = "Teilweise belegt (Uhrzeit in Schritt 3 anpassbar)";
-            preis = null;
+            const verfuegbar = istVerfuegbar(obj.name, startISO, endISO);
+            status = verfuegbar ? "verfügbar" : "nicht verfügbar";
+            preis = obj.preisProNacht * dauer;
+            info = verfuegbar ? "Im gewählten Zeitraum verfügbar" : "Im Zeitraum belegt";
           }
-        } else {
-          const verfuegbar = istVerfuegbar(obj.name, startISO, endISO);
-          status = verfuegbar ? "verfügbar" : "nicht verfügbar";
-          preis = obj.preisProNacht * dauer;
-          info = verfuegbar ? "Im gewählten Zeitraum verfügbar" : "Im Zeitraum belegt";
-        }
       }
 
       return { ...obj, status, info, preis };
@@ -664,11 +672,9 @@ export function useBuchungsAssistent() {
     // Automatische Anpassung von Start & Ende je nach Typ
     if (start) {
       if (istStundenbasiert(obj.name)) {
-        // Stundenbasiert -> Rückgabedatum ist automatisch Anreisedatum (gleicher Tag)
         end = start;
         setDateRange({ start, end: start });
       } else {
-        // Wohnung -> Abreisedatum ist mindestens der Folgetag
         if (!end || isSameDay(start, end)) {
           const folgetag = new Date(start);
           folgetag.setDate(folgetag.getDate() + 1);
@@ -678,48 +684,24 @@ export function useBuchungsAssistent() {
       }
     }
 
-    const sISO = toISO(start);
-    const eISO = toISO(end);
+    // Beide ISO-Variablen sauber definieren:
+    const aktuellesStartISO = toISO(start);
 
-    if (istStundenbasiert(obj.name) && start && end) {
-      const istStandardFrei = istVerfuegbar(
+    if (istStundenbasiert(obj.name) && start) {
+      const besterSlot = findeBestenFreienSlot(
         obj.name,
-        sISO,
-        eISO,
+        aktuellesStartISO,
+        bestehendeBuchungen,
         STANDARD_ANREISE_ZEIT,
-        STANDARD_ABREISE_ZEIT
+        STANDARD_ABREISE_ZEIT,
+        "06:00",
+        "22:00"
       );
 
-      if (istStandardFrei) {
-        setZeiten({ anreiseZeit: STANDARD_ANREISE_ZEIT, abreiseZeit: STANDARD_ABREISE_ZEIT });
+      if (besterSlot) {
+        setZeiten({ anreiseZeit: besterSlot.anreiseZeit, abreiseZeit: besterSlot.abreiseZeit });
       } else {
-        const tagesBelegungen = bestehendeBuchungen.filter(
-          (b) => b.resource?.toLowerCase() === obj.name?.toLowerCase() && b.start <= eISO && b.end >= sISO
-        );
-
-        let neueZeitGefunden = false;
-
-        if (tagesBelegungen.length > 0) {
-          const sortiert = [...tagesBelegungen].sort((a, b) =>
-            (b.abreiseZeit || "23:59").localeCompare(a.abreiseZeit || "23:59")
-          );
-          const naechsteFreieZeit = sortiert[0].abreiseZeit;
-
-          if (naechsteFreieZeit && naechsteFreieZeit < "22:00") {
-            const [h, m] = naechsteFreieZeit.split(":").map(Number);
-            const endH = Math.min(23, h + 4);
-            const endZeitStr = `${String(endH).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-
-            if (istVerfuegbar(obj.name, sISO, eISO, naechsteFreieZeit, endZeitStr)) {
-              setZeiten({ anreiseZeit: naechsteFreieZeit, abreiseZeit: endZeitStr });
-              neueZeitGefunden = true;
-            }
-          }
-        }
-
-        if (!neueZeitGefunden) {
-          setZeiten({ anreiseZeit: STANDARD_ANREISE_ZEIT, abreiseZeit: STANDARD_ABREISE_ZEIT });
-        }
+        setZeiten({ anreiseZeit: STANDARD_ANREISE_ZEIT, abreiseZeit: STANDARD_ABREISE_ZEIT });
       }
     }
 
@@ -867,32 +849,20 @@ export function useBuchungsAssistent() {
     const clickedDate = info.date;
     if (isPastDate(clickedDate)) return;
 
-    // Wenn bereits ein Objekt gewählt ist (z.B. im "Zeitraum ändern"-Modal in Schritt 2/3):
-    if (selectedObjekt) {
-      if (istStundenbasiert(selectedObjekt.name)) {
-        // Stundenbasiert -> gleicher Tag als Start und Ende
-        setDateRange({ start: clickedDate, end: clickedDate });
-        setHoveredDate(null);
-        return;
+    if (dateRange.start && !dateRange.end) {
+      if (clickedDate < dateRange.start) {
+        // Klick liegt vor der Anreise -> Anreise auf diesen Tag umsetzen
+        setDateRange({ start: clickedDate, end: null });
       } else {
-        // Wohnung:
-        if (!dateRange.start || (dateRange.start && dateRange.end)) {
-          const nextDay = new Date(clickedDate);
-          nextDay.setDate(nextDay.getDate() + 1);
-          setDateRange({ start: clickedDate, end: nextDay });
-          setHoveredDate(null);
-          return;
-        } else if (dateRange.start && !dateRange.end) {
-          if (clickedDate <= dateRange.start) {
-            const nextDay = new Date(clickedDate);
-            nextDay.setDate(nextDay.getDate() + 1);
-            setDateRange({ start: clickedDate, end: nextDay });
-          } else {
-            setDateRange({ start: dateRange.start, end: clickedDate });
-          }
-          return;
-        }
+        // 2. Klick: Abreisedatum setzen (egal ob gleicher Tag bei Bus oder Folgetage bei Wohnungen)
+        setDateRange({ start: dateRange.start, end: clickedDate });
+        setHoveredDate(null);
       }
+    } else {
+      // 1. Klick: Neues Anreisedatum wählen, Abreise leeren
+      setDateRange({ start: clickedDate, end: null });
+      setHoveredDate(null);
+    
     }
 
     // In Schritt 1 (noch kein Objekt ausgewählt):

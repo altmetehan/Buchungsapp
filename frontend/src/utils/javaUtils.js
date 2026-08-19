@@ -543,3 +543,163 @@ export function berechneLiveVerfuegbarkeit(objektName, alleBelegungen = [], eins
     return { status: "frei", info: "Durchgehend frei" };
   }
 }
+
+/** Wandelt Minuten seit Mitternacht in "HH:MM" um */
+export const minZuHHMM = (minuten) => {
+  const h = Math.floor(minuten / 60);
+  const m = minuten % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+};
+
+/** Wandelt "HH:MM" in Minuten seit Mitternacht um */
+export const hhmmZuMin = (hhmmStr) => {
+  if (!hhmmStr) return 0;
+  const [h, m] = hhmmStr.split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
+
+/**
+ * Ermittelt alle zusammenhängenden freien Zeitfenster zwischen minUhrzeit (06:00)
+ * und maxUhrzeit (22:00), die mindestens minDauerMinuten (Standard 60 Min.) lang sind.
+ */
+export const ermittleFreieStundenSlots = (
+  objektName,
+  dateISO,
+  alleBelegungen = [],
+  minDauerMinuten = 60,
+  minUhrzeit = "06:00",
+  maxUhrzeit = "22:00"
+) => {
+  if (!objektName || !dateISO) return [];
+
+  const windowStart = hhmmZuMin(minUhrzeit); // 360 (06:00)
+  const windowEnd = hhmmZuMin(maxUhrzeit);   // 1320 (22:00)
+  const objNameLower = objektName.toLowerCase().trim();
+
+  const tagesBelegungen = alleBelegungen.filter((b) => {
+    const resName = (b.resource || b.name || "").toLowerCase().trim();
+    if (resName !== objNameLower) return false;
+    return b.start <= dateISO && b.end >= dateISO;
+  });
+
+  const busyIntervals = [];
+
+  for (const b of tagesBelegungen) {
+    let startMin = 0;
+    let endMin = 1440;
+
+    if (b.start === dateISO && b.end === dateISO) {
+      startMin = hhmmZuMin(b.anreiseZeit || "00:00");
+      endMin = hhmmZuMin(b.abreiseZeit || "23:59");
+    } else if (b.start === dateISO && b.end > dateISO) {
+      startMin = hhmmZuMin(b.anreiseZeit || "00:00");
+      endMin = 1440;
+    } else if (b.start < dateISO && b.end === dateISO) {
+      startMin = 0;
+      endMin = hhmmZuMin(b.abreiseZeit || "23:59");
+    } else if (b.start < dateISO && b.end > dateISO) {
+      startMin = 0;
+      endMin = 1440;
+    }
+
+    const clippedStart = Math.max(windowStart, startMin);
+    const clippedEnd = Math.min(windowEnd, endMin);
+
+    if (clippedStart < clippedEnd) {
+      busyIntervals.push({ start: clippedStart, end: clippedEnd });
+    }
+  }
+
+  busyIntervals.sort((a, b) => a.start - b.start);
+  const mergedBusy = [];
+  for (const interval of busyIntervals) {
+    if (mergedBusy.length === 0) {
+      mergedBusy.push({ ...interval });
+    } else {
+      const last = mergedBusy[mergedBusy.length - 1];
+      if (interval.start <= last.end) {
+        last.end = Math.max(last.end, interval.end);
+      } else {
+        mergedBusy.push({ ...interval });
+      }
+    }
+  }
+
+  const freeSlots = [];
+  let curr = windowStart;
+
+  for (const busy of mergedBusy) {
+    if (busy.start > curr) {
+      const dauer = busy.start - curr;
+      if (dauer >= minDauerMinuten) {
+        freeSlots.push({
+          startMin: curr,
+          endMin: busy.start,
+          startStr: minZuHHMM(curr),
+          endStr: minZuHHMM(busy.start),
+          dauerMinuten: dauer,
+        });
+      }
+    }
+    curr = Math.max(curr, busy.end);
+  }
+
+  if (curr < windowEnd) {
+    const dauer = windowEnd - curr;
+    if (dauer >= minDauerMinuten) {
+      freeSlots.push({
+        startMin: curr,
+        endMin: windowEnd,
+        startStr: minZuHHMM(curr),
+        endStr: minZuHHMM(windowEnd),
+        dauerMinuten: dauer,
+      });
+    }
+  }
+
+  return freeSlots;
+};
+
+/**
+ * Wählt die beste freie Uhrzeit:
+ * 1. Falls 09:00–17:00 frei ist -> 09:00–17:00
+ * 2. Andernfalls das beste freie Zeitfenster >= 60 Min. zwischen 06:00 und 22:00
+ */
+export const findeBestenFreienSlot = (
+  objektName,
+  dateISO,
+  alleBelegungen = [],
+  standardAnreise = "09:00",
+  standardAbreise = "17:00",
+  minUhrzeit = "06:00",
+  maxUhrzeit = "22:00"
+) => {
+  const slots = ermittleFreieStundenSlots(
+    objektName,
+    dateISO,
+    alleBelegungen,
+    60,
+    minUhrzeit,
+    maxUhrzeit
+  );
+
+  if (slots.length === 0) return null;
+
+  const stdStartMin = hhmmZuMin(standardAnreise);
+  const stdEndMin = hhmmZuMin(standardAbreise);
+
+  const enthaeltStandard = slots.find(
+    (s) => s.startMin <= stdStartMin && s.endMin >= stdEndMin
+  );
+  if (enthaeltStandard) {
+    return { anreiseZeit: standardAnreise, abreiseZeit: standardAbreise };
+  }
+
+  const besterSlot = [...slots].sort((a, b) => b.dauerMinuten - a.dauerMinuten || a.startMin - b.startMin)[0];
+  const endMin = besterSlot.dauerMinuten > 480 ? besterSlot.startMin + 480 : besterSlot.endMin;
+
+  return {
+    anreiseZeit: besterSlot.startStr,
+    abreiseZeit: minZuHHMM(endMin),
+  };
+};
