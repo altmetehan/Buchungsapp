@@ -2,44 +2,68 @@ import React from 'react';
 import { Document, Page, Text, View, Image, StyleSheet } from '@react-pdf/renderer';
 import { getLogoBase64 } from '../utils/pdfUtils.js';
 
+/**
+ * @file RechnungDocument.js
+ * @description PDF-Rechnungsvorlage im CI-konformen Unternehmensdesign (Beckhoff Automation).
+ *              Generiert über `@react-pdf/renderer` eine druckreife A4-Rechnung mit
+ *              dynamischen Rechnungspositionen, optionalen Zusatzleistungen (z. B. Bus),
+ *              historisierten Preisanpassungen als Einzelposten sowie standardisiertem
+ *              Briefkopf, Fälligkeitsberechnung und dreispaltiger Fußzeile.
+ * @module pdf/RechnungDocument
+ */
+
+/**
+ * Alias für React.createElement zur lesbareren deklarativen Baumkonstruktion ohne JSX-Zwang im Backend.
+ * @type {Function}
+ */
 const h = React.createElement;
 
+/**
+ * Farbpalette für das PDF-Dokumentenlayout.
+ * @constant
+ * @type {Object.<string, string>}
+ */
 const COLORS = {
-  primary: '#E30000',       // Beckhoff Rot
-  textPrimary: '#18181B',   // Tiefes Anthrazit
-  textSecondary: '#52525B', // Neutrales Dunkelgrau
-  textMuted: '#8E8E93',     // Dezent für Meta/Linien
-  borderLight: '#E4E4E7',
-  borderDark: '#27272A',
-  white: '#FFFFFF',
+  primary: '#E30000',       // Beckhoff Rot (Akzentfarbe)
+  textPrimary: '#18181B',   // Tiefes Anthrazit für Fließtext und Titel
+  textSecondary: '#52525B', // Neutrales Dunkelgrau für Beschreibungen und Labels
+  textMuted: '#8E8E93',     // Dezent für Metadaten und Hilfslinien
+  borderLight: '#E4E4E7',   // Helle Trennlinien
+  borderDark: '#27272A',    // Dunkle Akzenttrennlinien (Tabellenkopf / Summenbereich)
+  bgSubtle: '#FAFAFA',      // Hintergründe für strukturierte Container
+  white: '#FFFFFF',         // Hintergrundfarbe der Seite
 };
 
+/**
+ * StyleSheet-Definitionen für das typografische Raster und Flexbox-Layout der PDF-Seite.
+ */
 const styles = StyleSheet.create({
   page: {
     fontFamily: 'Helvetica',
-    fontSize: 9.5,
-    lineHeight: 1.5,
+    fontSize: 7.5,
+    lineHeight: 1.4,
     color: COLORS.textPrimary,
-    paddingTop: 40,
-    paddingBottom: 85,
-    paddingHorizontal: 45,
+    paddingTop: 35,
+    paddingBottom: 70,
+    paddingHorizontal: 40,
     backgroundColor: COLORS.white,
   },
 
+  /* ---------------- Header ---------------- */
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 28,
+    marginBottom: 20,
   },
   logo: {
-    width: 140,
-    height: 38,
+    width: 120,
+    height: 32,
     objectFit: 'contain',
   },
   brandTextFallback: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 18,
+    fontSize: 15,
     color: COLORS.primary,
     letterSpacing: 0.5,
   },
@@ -48,43 +72,43 @@ const styles = StyleSheet.create({
   },
   companyNameHeader: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 10,
+    fontSize: 8.5,
     color: COLORS.textPrimary,
   },
   companySubHeader: {
-    fontSize: 8,
+    fontSize: 7,
     color: COLORS.textMuted,
     marginTop: 2,
   },
 
+  /* ---------------- Briefkopf & Metadaten ---------------- */
   letterHeadRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 28,
-    minHeight: 105,
+    marginBottom: 20,
+    minHeight: 85,
   },
   addressCol: {
     width: '55%',
   },
   senderSmall: {
-    fontSize: 7.5,
+    fontSize: 6.5,
     color: COLORS.textMuted,
-    marginBottom: 10,
+    marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
   recipientName: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 10.5,
+    fontSize: 8.5,
     color: COLORS.textPrimary,
     marginBottom: 2,
   },
   recipientLine: {
-    fontSize: 9.5,
+    fontSize: 7.5,
     color: COLORS.textPrimary,
-    lineHeight: 1.35,
+    lineHeight: 1.3,
   },
-
   metaCol: {
     width: '40%',
     paddingLeft: 10,
@@ -92,7 +116,7 @@ const styles = StyleSheet.create({
   metaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 2.5,
+    paddingVertical: 2,
     paddingBottom: 0,
     borderBottomWidth: 0.5,
     borderBottomColor: COLORS.textMuted,
@@ -100,53 +124,55 @@ const styles = StyleSheet.create({
   metaRowLast: {    
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 2.5,
+    paddingVertical: 2,
     paddingBottom: 0,
   },
   metaLabel: {
-    fontSize: 8.5,
+    fontSize: 7,
     color: COLORS.textSecondary,
   },
   metaValue: {
-    fontSize: 8.5,
+    fontSize: 7,
     fontFamily: 'Helvetica-Bold',
     color: COLORS.textPrimary,
   },
 
+  /* ---------------- Anrede & Titel ---------------- */
   docTitle: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 15,
+    fontSize: 12,
     color: COLORS.textPrimary,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   introText: {
-    fontSize: 9.5,
+    fontSize: 7.5,
     color: COLORS.textSecondary,
-    marginBottom: 20,
-    lineHeight: 1.4,
+    marginBottom: 14,
+    lineHeight: 1.35,
   },
 
+  /* ---------------- Positionstabelle ---------------- */
   table: {
     width: '100%',
-    marginBottom: 20,
+    marginBottom: 12,
   },
   tableHeader: {
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: COLORS.borderDark,
-    paddingBottom: 6,
+    paddingBottom: 4,
     paddingHorizontal: 2,
   },
   th: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 8.5,
+    fontSize: 7,
     color: COLORS.textPrimary,
   },
   tableRow: {
     flexDirection: 'row',
     borderBottomWidth: 0.5,
     borderBottomColor: COLORS.borderLight,
-    paddingVertical: 9,
+    paddingVertical: 6,
     paddingHorizontal: 2,
   },
   colPos: { width: '6%' },
@@ -154,22 +180,22 @@ const styles = StyleSheet.create({
   colQty: { width: '14%', textAlign: 'right' },
   colPrice: { width: '15%', textAlign: 'right' },
   colTotal: { width: '15%', textAlign: 'right' },
-
   itemTitle: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 9.5,
+    fontSize: 7.5,
     color: COLORS.textPrimary,
   },
   itemSubtitle: {
-    fontSize: 8,
+    fontSize: 6.5,
     color: COLORS.textSecondary,
-    marginTop: 2,
+    marginTop: 1.5,
   },
 
+  /* ---------------- Summenblock ---------------- */
   totalsSection: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    marginBottom: 25,
+    marginBottom: 16,
   },
   totalsTable: {
     width: '45%',
@@ -177,14 +203,14 @@ const styles = StyleSheet.create({
   totalsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 3,
+    paddingVertical: 2,
   },
   totalsLabel: {
-    fontSize: 9,
+    fontSize: 7.5,
     color: COLORS.textSecondary,
   },
   totalsValue: {
-    fontSize: 9,
+    fontSize: 7.5,
     color: COLORS.textPrimary,
   },
   grandTotalRow: {
@@ -194,32 +220,34 @@ const styles = StyleSheet.create({
     borderTopColor: COLORS.borderDark,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.borderDark,
-    marginTop: 6,
-    paddingVertical: 5,
+    marginTop: 4,
+    paddingVertical: 4,
   },
   grandTotalLabel: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 10.5,
+    fontSize: 8.5,
     color: COLORS.textPrimary,
   },
   grandTotalValue: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 11,
+    fontSize: 9,
     color: COLORS.primary,
   },
 
+  /* ---------------- Zahlungsbedingungen ---------------- */
   paymentTerms: {
     borderLeftWidth: 2,
     borderLeftColor: COLORS.primary,
-    paddingLeft: 10,
-    marginVertical: 14,
+    paddingLeft: 8,
+    marginVertical: 10,
   },
   paymentText: {
-    fontSize: 8.5,
+    fontSize: 7,
     color: COLORS.textSecondary,
-    lineHeight: 1.45,
+    lineHeight: 1.35,
   },
 
+  /* ---------------- Fußzeile ---------------- */
   footer: {
     position: 'absolute',
     bottom: 25,
@@ -229,52 +257,169 @@ const styles = StyleSheet.create({
     borderTopColor: COLORS.borderLight,
     paddingTop: 10,
     flexDirection: 'row',
-    justifyContent: 'space-between',
   },
   footerColLeft: {
-    flex: 1,
+    width: '33.33%',
     alignItems: 'flex-start',
+    textAlign: 'left',
   },
   footerColCenter: {
-    flex: 1,
-    alignItems: 'flex-start',
-    paddingLeft: 60,
+    width: '33.33%',
+    alignItems: 'center',
+    textAlign: 'center',
   },
   footerColRight: {
-    flex: 1,
-    paddingLeft: 60,
+    width: '33.33%',
+    alignItems: 'flex-end',
+    textAlign: 'right',
   },
   footerHeading: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 7.5,
+    fontSize: 6.5,
     color: COLORS.textPrimary,
-    marginBottom: 3,
+    marginBottom: 2,
   },
   footerText: {
-    fontSize: 7,
+    fontSize: 6,
     color: COLORS.textSecondary,
-    lineHeight: 1.35,
+    lineHeight: 1.25,
   },
   pageNumber: {
-    fontSize: 7,
+    fontSize: 6,
     color: COLORS.textMuted,
-    marginTop: 4,
+    marginTop: 3,
   },
 });
 
+/**
+ * Formatiert einen numerischen Betrag oder String als österreichische/deutsche Währungsangabe (z. B. "1.234,50 €").
+ *
+ * @function
+ * @param {number|string} val - Der zu formatierende Geldbetrag.
+ * @returns {string} Formatierter Währungsstring inklusive Euro-Zeichen.
+ */
 const formatCurrency = (val) => {
   const num = typeof val === 'number' ? val : parseFloat(val) || 0;
   return num.toLocaleString('de-AT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
 };
 
-const formatDate = (dateStr) => {
-  if (!dateStr) return '-';
+/**
+ * Wandelt ein Datum (als Date-Instanz, ISO-String oder deutsches Format) sicher in "DD.MM.YYYY" um.
+ *
+ * @function
+ * @param {Date|string|null|undefined} dateVal - Der eingehende Datumswert.
+ * @returns {string} Das formatierte Datum oder "-" bei ungültigem / fehlendem Wert.
+ */
+const formatDate = (dateVal) => {
+  if (!dateVal) return '-';
+  if (dateVal instanceof Date) {
+    if (isNaN(dateVal.getTime())) return '-';
+    const d = String(dateVal.getDate()).padStart(2, '0');
+    const m = String(dateVal.getMonth() + 1).padStart(2, '0');
+    const y = dateVal.getFullYear();
+    return `${d}.${m}.${y}`;
+  }
+  const dateStr = String(dateVal);
   if (dateStr.includes('.')) return dateStr;
-  const [y, m, d] = dateStr.split('-');
-  if (!y || !m || !d) return dateStr;
-  return `${d.padStart(2, '0')}.${m.padStart(2, '0')}.${y}`;
+  const parts = dateStr.split('T')[0].split('-');
+  if (parts.length === 3) {
+    const [y, m, d] = parts;
+    return `${d.padStart(2, '0')}.${m.padStart(2, '0')}.${y}`;
+  }
+  return dateStr;
 };
 
+/**
+ * @typedef {Object} Gast
+ * @property {string} [name] - Vollständiger Name des Gastes.
+ * @property {string} [vorname] - Vorname des Gastes.
+ * @property {string} [nachname] - Nachname des Gastes.
+ * @property {string} [anrede] - Anrede (z. B. "Herr", "Frau").
+ * @property {string} [firma] - Optionaler Firmenname für Geschäftskunden.
+ * @property {string} [strasse] - Straße der Anschrift.
+ * @property {string} [hnr] - Hausnummer.
+ * @property {string} [plz] - Postleitzahl.
+ * @property {string} [stadt] - Wohnort / Ort.
+ * @property {string} [land] - Herkunftsland.
+ */
+
+/**
+ * @typedef {Object} Objekt
+ * @property {number|string} [id] - Eindeutige ID des Objekts.
+ * @property {string} [name] - Bezeichnung der gemieteten Einheit (z. B. "Wohnung 1", "Vito Bus").
+ * @property {number} [preis] - Standardpreis pro Einheit.
+ */
+
+/**
+ * @typedef {Object} Preisanpassung
+ * @property {number|string} [id] - ID der Preisanpassung.
+ * @property {number} alter_betrag - Rechnungsbetrag vor der Anpassung.
+ * @property {number} neuer_betrag - Rechnungsbetrag nach der Anpassung.
+ * @property {string} grund - Begründung der Anpassung (z. B. Endreinigung, Nachberechnung).
+ * @property {string|Date} erstellt_am - Zeitstempel der Durchführung.
+ */
+
+/**
+ * @typedef {Object} Buchung
+ * @property {number|string} [id] - Vorgangs- bzw. Buchungs-ID.
+ * @property {string} [anreise] - Anreisedatum (ISO oder DD.MM.YYYY).
+ * @property {string} [abreise] - Abreisedatum (ISO oder DD.MM.YYYY).
+ * @property {number} [preis] - Aktueller finaler Buchungsbetrag.
+ * @property {Gast} [Gaeste] - Verknüpfte Gästedaten.
+ * @property {Objekt} [Objekte] - Hauptobjekt der Buchung.
+ * @property {Objekt} [ObjekteZusatz] - Optionales Zusatzobjekt (z. B. Kombi-Bus).
+ * @property {Preisanpassung[]} [Preisanpassungen] - Liste dokumentierter Preisanpassungen.
+ */
+
+/**
+ * @typedef {Object} Rechnung
+ * @property {number|string} [id] - ID des Rechnungsdatensatzes.
+ * @property {string} [rechnungs_nummer] - Generierte Rechnungsnummer (z. B. "RE-2026-0001").
+ * @property {string} [rechnungs_datum] - Datum der Rechnungsausstellung.
+ * @property {string} [faelligkeits_datum] - Optionales fixes Fälligkeitsdatum.
+ * @property {Buchung} [Buchungen] - Zugehörige Buchungsrelation.
+ */
+
+/**
+ * @typedef {Object} UnternehmensDaten
+ * @property {string} name - Offizielle Firmenbezeichnung.
+ * @property {string} strasse - Firmenadresse (Straße und Hausnummer).
+ * @property {string} plzOrt - PLZ und Ort des Firmensitzes.
+ * @property {string} land - Land des Firmensitzes.
+ * @property {string} email - Kontakt-E-Mail-Adresse.
+ * @property {string} telefon - Telefonnummer für Rückfragen.
+ * @property {string} web - Offizielle Webadresse.
+ * @property {string} iban - IBAN für Banküberweisungen.
+ * @property {string} bic - BIC / SWIFT-Code des Kreditinstituts.
+ * @property {string} bank - Name des kontoführenden Kreditinstituts.
+ * @property {string} firmenbuch - Firmenbuchnummer und zuständiges Landesgericht.
+ * @property {string} uid - Umsatzsteuer-Identifikationsnummer (UID/USt-IdNr.).
+ */
+
+/**
+ * @typedef {Object} RechnungDocumentProps
+ * @property {Rechnung} [rechnung] - Rechnungsdatensatz aus der Datenbank.
+ * @property {Buchung} [buchung] - Direkte Buchungsdaten (Fallback zu `rechnung.Buchungen`).
+ * @property {Gast|null} [gast] - Gaststammdaten (Fallback zu `buchung.Gaeste`).
+ * @property {Objekt|null} [objekt] - Stammdaten des Hauptobjekts (Fallback zu `buchung.Objekte`).
+ * @property {string|null} [rechnungsNummer] - Explizite Rechnungsnummer zur Überschreibung.
+ * @property {string|null} [rechnungsDatum] - Explizites Rechnungsdatum zur Überschreibung.
+ * @property {string|null} [faelligkeitsDatum] - Explizites Fälligkeitsdatum zur Überschreibung.
+ * @property {string|null} [logoSrc] - Base64-Data-URI oder Bild-URL des Firmenlogos.
+ * @property {UnternehmensDaten} [unternehmensDaten] - Absender- und Unternehmensstammdaten.
+ */
+
+/**
+ * RechnungDocument-Komponente.
+ *
+ * Erstellt ein standardisiertes PDF-Rechnungsdokument auf A4-Basis für Buchungen.
+ * Berechnet automatisch Zwischensumme, Fälligkeitstermine und schlüsselt Hauptleistungen,
+ * Zusatzleistungen sowie Preisanpassungen als Einzelpositionen auf.
+ *
+ * @component
+ * @param {RechnungDocumentProps} props - Die Eigenschaften zur PDF-Generierung.
+ * @returns {JSX.Element} Das gerenderte React-PDF Document-Element.
+ */
 export function RechnungDocument({
   rechnung = {},
   buchung = {},
@@ -299,21 +444,39 @@ export function RechnungDocument({
     uid: 'ATU 54127804',
   },
 }) {
+  // Absicherung des Logos: Übergebene Quelle oder System-Base64-Fallback
   const finalLogo = logoSrc || getLogoBase64();
+
+  // Relationale Datenstrukturen auflösen
   const currentBuchung = buchung || rechnung?.Buchungen || {};
   const currentGast = gast || currentBuchung?.Gaeste || {};
   const currentObjekt = objekt || currentBuchung?.Objekte || {};
 
+  // Rechnungsmetadaten bestimmen
   const rNr = rechnungsNummer || rechnung?.rechnungs_nummer || 'RE-2026-0001';
   const rDatum = rechnungsDatum || rechnung?.rechnungs_datum || currentBuchung?.abreise || new Date().toISOString().split('T')[0];
 
+  /**
+   * Berechnet das Fälligkeitsdatum (standardmäßig Rechnungsdatum + 14 Tage).
+   *
+   * @function
+   * @returns {string} Das formatierte Fälligkeitsdatum.
+   */
   const calcFaelligkeit = () => {
     if (faelligkeitsDatum) return formatDate(faelligkeitsDatum);
     if (rechnung?.faelligkeits_datum) return formatDate(rechnung.faelligkeits_datum);
-    const d = new Date(rDatum.includes('.') ? rDatum.split('.').reverse().join('-') : rDatum);
+    let d;
+    if (rDatum instanceof Date) {
+      d = new Date(rDatum.getTime());
+    } else if (typeof rDatum === 'string') {
+      const parts = rDatum.includes('.') ? rDatum.split('.').reverse().join('-') : rDatum;
+      d = new Date(parts);
+    } else {
+      d = new Date();
+    }
     if (!isNaN(d.getTime())) {
       d.setDate(d.getDate() + 14);
-      return formatDate(d.toISOString().split('T')[0]);
+      return formatDate(d);
     }
     return '-';
   };
@@ -321,9 +484,92 @@ export function RechnungDocument({
   const isWohnung = Boolean(currentObjekt?.name?.toLowerCase().includes('wohnung'));
   const gesamtpreis = Number(currentBuchung?.preis || 0);
 
+  // Empfängerdaten zusammensetzen
   const gastName = currentGast?.name || `${currentGast?.vorname || ''} ${currentGast?.nachname || ''}`.trim() || 'Gast';
   const gastAdresse = currentGast?.strasse ? `${currentGast.strasse} ${currentGast.hnr || ''}`.trim() : 'Musterstraße 1';
   const gastOrt = `${currentGast?.plz || '6700'} ${currentGast?.stadt || 'Bludenz'}`;
+
+  // Preisanpassungshistorie chronologisch aufsteigend sortieren
+  const rawHistorie = currentBuchung?.Preisanpassungen || currentBuchung?.preisanpassungen || rechnung?.Preisanpassungen || rechnung?.preisanpassungen || [];
+  const preisHistorie = Array.isArray(rawHistorie)
+    ? [...rawHistorie].sort((a, b) => new Date(a.erstellt_am || 0) - new Date(b.erstellt_am || 0))
+    : [];
+
+  // Ursprungspreis vor allen nachträglichen Preisanpassungen bestimmen
+  const urspruenglicherPreis = preisHistorie.length > 0 ? Number(preisHistorie[0].alter_betrag || 0) : gesamtpreis;
+
+  // Dynamischer Aufbau aller Rechnungspositionszeilen
+  let pos = 1;
+  const tableRows = [];
+
+  // 1. Hauptleistungsposition
+  tableRows.push(
+    h(
+      View,
+      { key: 'pos-main', style: styles.tableRow },
+      h(Text, { style: styles.colPos }, String(pos++)),
+      h(
+        View,
+        { style: styles.colDesc },
+        h(Text, { style: styles.itemTitle }, currentObjekt?.name || 'Aufenthalt'),
+        h(
+          Text,
+          { style: styles.itemSubtitle },
+          `Zeitraum: ${formatDate(currentBuchung?.anreise)} bis ${formatDate(currentBuchung?.abreise)}`
+        )
+      ),
+      h(Text, { style: styles.colQty }, isWohnung ? 'Pauschal' : 'Std.'),
+      h(Text, { style: styles.colPrice }, formatCurrency(urspruenglicherPreis)),
+      h(Text, { style: styles.colTotal }, formatCurrency(urspruenglicherPreis))
+    )
+  );
+
+  // 2. Optionale Zusatzleistung (z. B. mitgebuchter Bus bei Kombibuchung)
+  if (currentBuchung?.ObjekteZusatz) {
+    tableRows.push(
+      h(
+        View,
+        { key: 'pos-zusatz', style: styles.tableRow },
+        h(Text, { style: styles.colPos }, String(pos++)),
+        h(
+          View,
+          { style: styles.colDesc },
+          h(Text, { style: styles.itemTitle }, `Zusatzleistung: ${currentBuchung.ObjekteZusatz.name}`),
+          h(Text, { style: styles.itemSubtitle }, 'Nutzung im selben Zeitraum (Kombibuchung)')
+        ),
+        h(Text, { style: styles.colQty }, 'Pauschal'),
+        h(Text, { style: styles.colPrice }, 'Inklusive'),
+        h(Text, { style: styles.colTotal }, 'Inklusive')
+      )
+    );
+  }
+
+  // 3. Preisanpassungen als eigene Rechnungspostenzeilen
+  preisHistorie.forEach((item, idx) => {
+    const diff = (Number(item.neuer_betrag) || 0) - (Number(item.alter_betrag) || 0);
+    const formattedDiff = diff > 0 ? `+${formatCurrency(diff)}` : formatCurrency(diff);
+
+    tableRows.push(
+      h(
+        View,
+        { key: `pos-adj-${item.id || idx}`, style: styles.tableRow },
+        h(Text, { style: styles.colPos }, String(pos++)),
+        h(
+          View,
+          { style: styles.colDesc },
+          h(Text, { style: styles.itemTitle }, `Preisanpassung: ${item.grund || 'Korrektur'}`),
+          h(
+            Text,
+            { style: styles.itemSubtitle },
+            `vom ${formatDate(item.erstellt_am)} (von ${formatCurrency(item.alter_betrag)} auf ${formatCurrency(item.neuer_betrag)})`
+          )
+        ),
+        h(Text, { style: styles.colQty }, 'Pauschal'),
+        h(Text, { style: styles.colPrice }, formattedDiff),
+        h(Text, { style: styles.colTotal }, formattedDiff)
+      )
+    );
+  });
 
   return h(
     Document,
@@ -332,7 +578,9 @@ export function RechnungDocument({
       Page,
       { size: 'A4', style: styles.page },
 
-      // 1. HEADER
+      // ===================================================================
+      // 1. KOPFBEREICH: Firmenlogo & Kurzangaben
+      // ===================================================================
       h(
         View,
         { style: styles.headerRow },
@@ -347,7 +595,9 @@ export function RechnungDocument({
         )
       ),
 
-      // 2. BRIEFFENSTER & META
+      // ===================================================================
+      // 2. BRIEFFENSTER & METADATEN-CONTAINER
+      // ===================================================================
       h(
         View,
         { style: styles.letterHeadRow },
@@ -390,7 +640,9 @@ export function RechnungDocument({
         )
       ),
 
-      // 3. ANREDE
+      // ===================================================================
+      // 3. ANREDE & DOKUMENTENTITEL
+      // ===================================================================
       h(Text, { style: styles.docTitle }, `Rechnung ${rNr}`),
       h(
         Text,
@@ -399,7 +651,9 @@ export function RechnungDocument({
         'wir bedanken uns für Ihre Buchung und stellen Ihnen die vereinbarten Leistungen in Rechnung:'
       ),
 
-      // 4. TABELLE
+      // ===================================================================
+      // 4. POSITIONSTABELLE (HAUPT-, ZUSATZLEISTUNGEN & PREISANPASSUNGEN)
+      // ===================================================================
       h(
         View,
         { style: styles.table },
@@ -412,43 +666,12 @@ export function RechnungDocument({
           h(Text, { style: [styles.th, styles.colPrice] }, 'Einzelpreis'),
           h(Text, { style: [styles.th, styles.colTotal] }, 'Gesamtpreis')
         ),
-        h(
-          View,
-          { style: styles.tableRow },
-          h(Text, { style: styles.colPos }, '1'),
-          h(
-            View,
-            { style: styles.colDesc },
-            h(Text, { style: styles.itemTitle }, currentObjekt?.name || 'Aufenthalt'),
-            h(
-              Text,
-              { style: styles.itemSubtitle },
-              `Zeitraum: ${formatDate(currentBuchung?.anreise)} bis ${formatDate(currentBuchung?.abreise)}`
-            )
-          ),
-          h(Text, { style: styles.colQty }, isWohnung ? 'Pauschal' : 'Std.'),
-          h(Text, { style: styles.colPrice }, formatCurrency(gesamtpreis)),
-          h(Text, { style: styles.colTotal }, formatCurrency(gesamtpreis))
-        ),
-        currentBuchung?.ObjekteZusatz
-          ? h(
-              View,
-              { style: styles.tableRow },
-              h(Text, { style: styles.colPos }, '2'),
-              h(
-                View,
-                { style: styles.colDesc },
-                h(Text, { style: styles.itemTitle }, `Zusatzleistung: ${currentBuchung.ObjekteZusatz.name}`),
-                h(Text, { style: styles.itemSubtitle }, 'Nutzung im selben Zeitraum (Kombibuchung)')
-              ),
-              h(Text, { style: styles.colQty }, '1 Pausch.'),
-              h(Text, { style: styles.colPrice }, 'Inklusive'),
-              h(Text, { style: styles.colTotal }, 'Inklusive')
-            )
-          : null
+        ...tableRows
       ),
 
-      // 5. SUMMEN
+      // ===================================================================
+      // 5. SUMMENBLOCK (ZWISCHENSUMME & ENDBETRAG)
+      // ===================================================================
       h(
         View,
         { style: styles.totalsSection, wrap: false },
@@ -470,7 +693,9 @@ export function RechnungDocument({
         )
       ),
 
-      // 6. ZAHLUNGSTEXT
+      // ===================================================================
+      // 6. ZAHLUNGSZIEL & ÜBERWEISUNGSHINWEIS
+      // ===================================================================
       h(
         View,
         { style: styles.paymentTerms, wrap: false },
@@ -482,7 +707,9 @@ export function RechnungDocument({
         )
       ),
 
-      // 7. FOOTER
+      // ===================================================================
+      // 7. FUSSZEILE (DREISPALTIG AUSGERICHTET)
+      // ===================================================================
       h(
         View,
         { style: styles.footer },

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { TimeDropdown } from "../components/ui/TimeDropdown";
+import { WeekdayDropdown } from "../components/ui/WeekdayDropdown";
 import { Toast } from "../components/ui/Toast";
 import { useEinstellungen } from "../hooks/useEinstellungen";
 import "../styles/shared-ui.css";
@@ -131,57 +132,19 @@ export function Einstellungen() {
             onChange={(val) => setForm({ ...form, checkout_zeit: val })}
           />
 
-          <div className="input-group">
-            <label>Check-in nur am Wochentag</label>
-            <select
-              value={form.checkin_wochentag || ""}
-              onChange={(e) => handleCheckinWochentagChange(e.target.value)}
-              className="select-dropdown-trigger"
-              style={{
-                width: "100%",
-                height: "42px",
-                padding: "0 12px",
-                border: "1px solid #e4e4e7",
-                borderRadius: "6px",
-                background: "#ffffff",
-              }}
-            >
-              {WOCHENTAG_OPTIONEN.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            <span style={{ fontSize: "12px", color: "#71717a", marginTop: "4px" }}>
-              z. B. „Freitag“ auswählen, falls Anreisen nur freitags erlaubt sind.
-            </span>
-          </div>
+          <WeekdayDropdown
+            label="Check-in nur am Wochentag"
+            value={form.checkin_wochentag || ""}
+            onChange={handleCheckinWochentagChange}
+            hint="z. B. „Freitag“ auswählen, falls Anreisen nur freitags erlaubt sind."
+          />
 
-          <div className="input-group">
-            <label>Check-out nur am Wochentag</label>
-            <select
-              value={form.checkout_wochentag || ""}
-              onChange={(e) => handleCheckoutWochentagChange(e.target.value)}
-              className="select-dropdown-trigger"
-              style={{
-                width: "100%",
-                height: "42px",
-                padding: "0 12px",
-                border: "1px solid #e4e4e7",
-                borderRadius: "6px",
-                background: "#ffffff",
-              }}
-            >
-              {WOCHENTAG_OPTIONEN.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            <span style={{ fontSize: "12px", color: "#71717a", marginTop: "4px" }}>
-              z. B. „Freitag“ auswählen, falls Abreisen nur freitags erlaubt sind.
-            </span>
-          </div>
+          <WeekdayDropdown
+            label="Check-out nur am Wochentag"
+            value={form.checkout_wochentag || ""}
+            onChange={handleCheckoutWochentagChange}
+            hint="z. B. „Freitag“ auswählen, falls Abreisen nur freitags erlaubt sind."
+          />
 
           <div className="input-group full-width">
             <label>Mindestanzahl Nächte pro Wohnungsbuchung *</label>
