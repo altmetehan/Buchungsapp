@@ -16,16 +16,25 @@ import { WebSocketServer } from "ws";
  * sehen.
  */
 
+/**
+ * Der aktive WebSocket-Server, oder null, solange initWebSocket() noch
+ * nicht aufgerufen wurde.
+ * @type {import("ws").WebSocketServer | null}
+ */
 let wss = null;
 
 /**
- * Muss genau einmal beim Serverstart aufgerufen werden, mit dem
- * rohen HTTP-Server (nicht der Express-App selbst!) als Argument -
- * siehe server.js. Der WebSocket-Server hängt sich dadurch an
- * denselben Port wie die normale REST-API, es muss also nichts an
- * Firewall/CORS zusätzlich freigeschaltet werden.
+ * Hängt den WebSocket-Server an einen bestehenden HTTP-Server und
+ * richtet einen periodischen Ping/Pong-Heartbeat ein, um tote
+ * Verbindungen zu erkennen. Muss genau einmal beim Serverstart
+ * aufgerufen werden, mit dem rohen HTTP-Server (nicht der
+ * Express-App selbst!) als Argument - siehe server.js. Der
+ * WebSocket-Server hängt sich dadurch an denselben Port wie die
+ * normale REST-API, es muss also nichts an Firewall/CORS zusätzlich
+ * freigeschaltet werden.
  *
- * @param {import("http").Server} httpServer
+ * @param {import("http").Server} httpServer - der rohe HTTP-Server aus server.js
+ * @returns {void}
  */
 export function initWebSocket(httpServer) {
   wss = new WebSocketServer({ server: httpServer, path: "/ws" });
@@ -75,8 +84,9 @@ export function initWebSocket(httpServer) {
  * nichts - broadcast() soll niemals selbst der Grund sein, warum ein
  * eigentlich erfolgreicher API-Request mit einem 500er fehlschlägt.
  *
- * @param {string} type - z.B. "buchungen:changed", "anfragen:changed"
- * @param {object} [payload] - optionale Zusatzinfo (z.B. die betroffene ID) - aktuell ungenutzt vom Frontend, das lädt bei jedem Event einfach komplett neu, steht aber schon bereit für später
+ * @param {string} type - Event-Name, z.B. "buchungen:changed", "anfragen:changed"
+ * @param {object} [payload={}] - optionale Zusatzinfo (z.B. die betroffene ID) - aktuell ungenutzt vom Frontend, das lädt bei jedem Event einfach komplett neu, steht aber schon bereit für später
+ * @returns {void}
  */
 export function broadcast(type, payload = {}) {
   if (!wss) return;

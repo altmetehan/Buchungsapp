@@ -3,9 +3,34 @@ import { prisma } from "../prismaClient.js";
 import { broadcast } from "../ws.js";
 import { parseGermanDate } from "../utils/dateUtils.js";
 
+/**
+ * gaeste.routes.js
+ * ----------------
+ * CRUD-Endpunkte für die Gästeverwaltung (/api/gaeste). Gäste werden
+ * per Soft-Delete entfernt (geloescht_am gesetzt statt Zeile
+ * gelöscht), damit historische Buchungen weiterhin auf ihren Gast
+ * verweisen können.
+ */
 const router = Router();
 
-// GET /api/gaeste - Nur aktive (nicht gelöschte) Gäste
+/**
+ * Normalisiert eine E-Mail-Adresse aus dem Request-Body: trimmt
+ * Whitespace und wandelt in Kleinschreibung um. Leere Strings werden
+ * zu null, damit sie nicht versehentlich die Unique-Constraint auf
+ * "email" verletzen (mehrere Gäste ohne E-Mail wären sonst alle
+ * "gleich").
+ *
+ * @param {string|null|undefined} email
+ * @returns {string|null}
+ */
+function normalisiereEmail(email) {
+  return email && email.trim() !== "" ? email.trim().toLowerCase() : null;
+}
+
+/**
+ * GET /api/gaeste
+ * Liefert alle aktiven (nicht gelöschten) Gäste.
+ */
 router.get("/", async (req, res) => {
   try {
     const gaeste = await prisma.gaeste.findMany({
@@ -17,19 +42,24 @@ router.get("/", async (req, res) => {
   }
 });
 
-// POST /api/gaeste - Neuen Gast anlegen
+/**
+ * POST /api/gaeste
+ * Legt einen neuen Gast an. Erwartet im Body: name, email, telnr,
+ * strasse, hnr, plz, stadt, land. Lehnt doppelte E-Mail-Adressen unter
+ * aktiven Gästen ab (freundliche Fehlermeldung statt rohem
+ * Datenbankfehler).
+ */
 router.post("/", async (req, res) => {
   try {
     const { name, email, telnr, strasse, hnr, plz, stadt, land } = req.body;
-    const emailClean = email && email.trim() !== "" ? email.trim().toLowerCase() : null;
+    const emailClean = normalisiereEmail(email);
 
-    // 1. Prüfung auf doppelte E-Mail bei aktiven Gästen
+    // Vorab-Prüfung auf doppelte E-Mail bei aktiven Gästen - liefert
+    // eine verständliche 400er-Meldung statt eines rohen
+    // Datenbank-Constraint-Fehlers weiter unten.
     if (emailClean) {
       const bestehenderGast = await prisma.gaeste.findFirst({
-        where: {
-          email: emailClean,
-          geloescht_am: null,
-        },
+        where: { email: emailClean, geloescht_am: null },
       });
 
       if (bestehenderGast) {
@@ -55,7 +85,8 @@ router.post("/", async (req, res) => {
     broadcast("gaeste:changed");
     res.status(201).json(neuerGast);
   } catch (err) {
-    // Prisma Unique-Constraint-Fehler (P2002) abfangen
+    // Prisma-Unique-Constraint-Fehler (P2002) als eigenen, freundlichen
+    // Fehler abfangen statt der internen Prisma-Fehlermeldung.
     if (err.code === "P2002") {
       return res.status(400).json({
         error: "Ein Gast mit dieser E-Mail-Adresse existiert bereits.",
@@ -65,14 +96,19 @@ router.post("/", async (req, res) => {
   }
 });
 
-// PUT /api/gaeste/:id - Gastdaten bearbeiten
+/**
+ * PUT /api/gaeste/:id
+ * Aktualisiert die Stammdaten eines bestehenden Gasts. Prüft erneut
+ * auf E-Mail-Duplikate (unter Ausschluss des Gasts selbst).
+ */
 router.put("/:id", async (req, res) => {
   try {
     const gastId = Number(req.params.id);
     const { name, email, telnr, strasse, hnr, plz, stadt, land } = req.body;
-    const emailClean = email && email.trim() !== "" ? email.trim().toLowerCase() : null;
+    const emailClean = normalisiereEmail(email);
 
-    // Prüfung auf doppelte E-Mail (andere aktive Gäste ausschließen)
+    // Duplikat-Prüfung auf andere aktive Gäste (NOT id: gastId), damit
+    // ein Gast seine eigene, unveränderte E-Mail behalten darf.
     if (emailClean) {
       const duplikat = await prisma.gaeste.findFirst({
         where: {
@@ -91,6 +127,9 @@ router.put("/:id", async (req, res) => {
 
     const updated = await prisma.gaeste.update({
       where: { id: gastId },
+      // Bewusst ein explizites Datenobjekt statt "data: req.body":
+      // so kann der Request-Body keine unerwarteten Felder (z.B. eine
+      // fremde "id" oder "geloescht_am") mit-updaten.
       data: {
         name,
         email: emailClean,
@@ -115,7 +154,13 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// DELETE /api/gaeste/:id - Soft-Delete mit Prüfung auf aktive/zukünftige Buchungen
+/**
+ * DELETE /api/gaeste/:id
+ * Soft-Delete eines Gasts. Wird verweigert, solange der Gast noch eine
+ * aktive oder zukünftige Buchung hat (abgeleitet aus dem
+ * Abreisedatum), damit historische/aktuelle Buchungen nie auf einen
+ * "verschwundenen" Gast zeigen.
+ */
 router.delete("/:id", async (req, res) => {
   try {
     const gastId = Number(req.params.id);

@@ -6,13 +6,19 @@ import React from "react";
 import { RechnungDocument } from "../pdf/RechnungDocument.js";
 import { generiereNaechsteRechnungsnummer } from "../utils/invoiceUtils.js";
 
+/**
+ * rechnungen.routes.js
+ * ---------------------
+ * CRUD-Endpunkte für Rechnungen (/api/rechnungen) sowie deren
+ * PDF-Erzeugung. Eine Rechnung hängt immer an genau einer Buchung.
+ */
 const router = Router();
 
 /**
- * Eine Rechnung hängt an genau einer Buchung, die wiederum einen Gast
- * und ein Objekt hat - dieser "include"-Block holt alle drei Ebenen auf
- * einmal, damit das Frontend Gast-/Objektnamen und Preis direkt zur
- * Verfügung hat, ohne selbst nachfragen zu müssen.
+ * Gemeinsamer "include"-Block für die normalen JSON-Listen-/CRUD-
+ * Endpunkte: holt Gast-, Objekt- und Buchungsdaten mit, damit das
+ * Frontend Gast-/Objektnamen und Preis direkt zur Verfügung hat, ohne
+ * selbst nachzufragen.
  */
 const MIT_BUCHUNG_GAST_UND_OBJEKT = {
   include: {
@@ -26,7 +32,90 @@ const MIT_BUCHUNG_GAST_UND_OBJEKT = {
   },
 };
 
-/** GET /api/rechnungen - liefert alle Rechnungen inkl. verknüpfter Buchung/Gast/Objekt. */
+/**
+ * Eigener, vollständigerer Include NUR für die PDF-Routen -
+ * MIT_BUCHUNG_GAST_UND_OBJEKT bleibt bewusst unverändert, damit sich am
+ * normalen JSON-Response von GET / nichts ändert. Die PDF braucht
+ * zusätzlich ObjekteZusatz (Kombibuchung Wohnung + Bus) und die
+ * komplette Preisanpassungs-Historie.
+ */
+const MIT_VOLLSTAENDIGEN_BUCHUNGSDATEN = {
+  include: {
+    Buchungen: {
+      include: {
+        Gaeste: true,
+        Objekte: true,
+        ObjekteZusatz: true,
+        Preisanpassungen: { orderBy: { erstellt_am: "asc" } },
+      },
+    },
+  },
+};
+
+/**
+ * Erlaubte, vom Client änderbare Felder einer bestehenden Rechnung
+ * (PUT /:id). In der Praxis wird i.d.R. nur die Rechnungsnummer
+ * oder das -datum manuell korrigiert.
+ *
+ * Vorher wurde "data: req.body" direkt durchgereicht (Mass-Assignment-
+ * Risiko, z.B. ein versehentliches Überschreiben von "buchung_id").
+ * Die explizite Liste hier verhindert das.
+ *
+ * @param {object} body - req.body
+ * @returns {object}
+ */
+function baueRechnungUpdateDaten(body) {
+  const erlaubteFelder = ["rechnungs_nummer", "rechnungs_datum"];
+  const daten = {};
+  for (const feld of erlaubteFelder) {
+    if (body[feld] !== undefined) daten[feld] = body[feld];
+  }
+  return daten;
+}
+
+/**
+ * Rendert eine Rechnung (per rechnungs_id ODER buchung_id gefunden) zu
+ * einem PDF-Buffer. Zentrale Hilfsfunktion für beide PDF-Routen unten,
+ * damit die Render-Logik nicht doppelt gepflegt werden muss.
+ *
+ * @param {{where: object}} query - Prisma-"where"-Bedingung, um genau eine Rechnung zu finden
+ * @returns {Promise<{rechnung: object, pdfBuffer: Buffer}|null>} null, falls keine passende Rechnung existiert
+ */
+async function rendereRechnungsPdf(where) {
+  const rechnung = await prisma.rechnungen.findFirst({
+    where,
+    ...MIT_VOLLSTAENDIGEN_BUCHUNGSDATEN,
+  });
+
+  if (!rechnung) return null;
+
+  const pdfBuffer = await renderToBuffer(
+    React.createElement(RechnungDocument, { rechnung, buchung: rechnung.Buchungen })
+  );
+
+  return { rechnung, pdfBuffer };
+}
+
+/**
+ * Schickt einen fertig gerenderten Rechnungs-PDF-Buffer als
+ * "inline"-Antwort raus (öffnet im Browser-Tab statt sofort
+ * herunterzuladen; von dort lässt sie sich trotzdem ganz normal
+ * abspeichern).
+ *
+ * @param {import("express").Response} res
+ * @param {{rechnung: object, pdfBuffer: Buffer}} ergebnis
+ * @returns {void}
+ */
+function sendeRechnungsPdf(res, { rechnung, pdfBuffer }) {
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `inline; filename="Rechnung-${rechnung.rechnungs_nummer}.pdf"`);
+  res.send(pdfBuffer);
+}
+
+/**
+ * GET /api/rechnungen
+ * Liefert alle Rechnungen inkl. verknüpfter Buchung/Gast/Objekt.
+ */
 router.get("/", async (req, res) => {
   try {
     const rechnungen = await prisma.rechnungen.findMany({
@@ -40,9 +129,11 @@ router.get("/", async (req, res) => {
 });
 
 /**
- * POST /api/rechnungen - legt eine neue Rechnung zu einer bestehenden
- * Buchung an. Erwartet im Body mindestens: buchung_id, rechnungs_datum
- * (+ optional rechnungs_nummer).
+ * POST /api/rechnungen
+ * Legt eine neue Rechnung zu einer bestehenden Buchung an. Erwartet im
+ * Body mindestens: buchung_id, rechnungs_datum (+ optional
+ * rechnungs_nummer).
+ *
  * Wird "rechnungs_nummer" nicht mitgeschickt (z.B. beim automatischen
  * Anlegen direkt nach einer Buchung aus dem Buchungs-Assistenten),
  * vergibt das Backend selbst eine fortlaufende Nummer. Die
@@ -74,12 +165,16 @@ router.post("/", async (req, res) => {
   }
 });
 
-/** PUT /api/rechnungen/:id - i.d.R. nur Rechnungsnummer/-datum korrigieren. */
+/**
+ * PUT /api/rechnungen/:id
+ * Korrigiert i.d.R. nur Rechnungsnummer/-datum einer bestehenden
+ * Rechnung.
+ */
 router.put("/:id", async (req, res) => {
   try {
     const updated = await prisma.rechnungen.update({
       where: { id: Number(req.params.id) },
-      data: req.body,
+      data: baueRechnungUpdateDaten(req.body),
       ...MIT_BUCHUNG_GAST_UND_OBJEKT,
     });
     broadcast("rechnungen:changed");
@@ -89,7 +184,11 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-/** DELETE /api/rechnungen/:id - löscht eine Rechnung endgültig. */
+/**
+ * DELETE /api/rechnungen/:id
+ * Löscht eine Rechnung endgültig (kein Soft-Delete - eine Rechnung
+ * ohne zugehörige Buchung hat keinen eigenen Aussagewert mehr).
+ */
 router.delete("/:id", async (req, res) => {
   try {
     await prisma.rechnungen.delete({ where: { id: Number(req.params.id) } });
@@ -100,29 +199,10 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-// Eigener, vollständigerer Include NUR für die PDF-Route -
-// MIT_BUCHUNG_GAST_UND_OBJEKT bleibt bewusst unverändert, damit sich am
-// normalen JSON-Response von GET / nichts ändert. Die PDF braucht
-// zusätzlich ObjekteZusatz (Kombibuchung Wohnung + Bus) und die
-// komplette Preisanpassungs-Historie.
-const MIT_VOLLSTAENDIGEN_BUCHUNGSDATEN = {
-  include: {
-    Buchungen: {
-      include: {
-        Gaeste: true,
-        Objekte: true,
-        ObjekteZusatz: true,
-        Preisanpassungen: { orderBy: { erstellt_am: "asc" } },
-      },
-    },
-  },
-};
-
 /**
  * GET /api/rechnungen/:id/pdf
- * ----------------------------
- * Baut die Rechnung als PDF und schickt sie direkt als Antwort zurück -
- * bewusst ohne die Datei irgendwo zu speichern/zu cachen. Grund:
+ * Baut die Rechnung als PDF und schickt sie direkt als Antwort zurück
+ * - bewusst ohne die Datei irgendwo zu speichern/zu cachen. Grund:
  * buchung.preis kann sich jederzeit über eine Preisanpassung ändern
  * (Rechnungen.jsx-Bearbeiten-Modal) - bei einer gecachten Datei müsste
  * man bei jeder solchen Änderung aktiv daran denken, die alte PDF zu
@@ -133,25 +213,13 @@ const MIT_VOLLSTAENDIGEN_BUCHUNGSDATEN = {
  */
 router.get("/:id/pdf", async (req, res) => {
   try {
-    const rechnung = await prisma.rechnungen.findUnique({
-      where: { id: Number(req.params.id) },
-      ...MIT_VOLLSTAENDIGEN_BUCHUNGSDATEN,
-    });
+    const ergebnis = await rendereRechnungsPdf({ id: Number(req.params.id) });
 
-    if (!rechnung) {
+    if (!ergebnis) {
       return res.status(404).json({ error: "Rechnung nicht gefunden" });
     }
 
-    const pdfBuffer = await renderToBuffer(
-      React.createElement(RechnungDocument, { rechnung, buchung: rechnung.Buchungen })
-    );
-
-    res.setHeader("Content-Type", "application/pdf");
-    // "inline" statt "attachment": öffnet die PDF im Browser-Tab, statt
-    // sie sofort erzwungen herunterzuladen - von dort kann man sie
-    // trotzdem ganz normal über den Browser abspeichern.
-    res.setHeader("Content-Disposition", `inline; filename="Rechnung-${rechnung.rechnungs_nummer}.pdf"`);
-    res.send(pdfBuffer);
+    sendeRechnungsPdf(res, ergebnis);
   } catch (err) {
     console.error("Fehler beim Erstellen der Rechnungs-PDF:", err);
     res.status(500).json({ error: "PDF konnte nicht erstellt werden" });
@@ -160,30 +228,19 @@ router.get("/:id/pdf", async (req, res) => {
 
 /**
  * GET /api/rechnungen/buchung/:buchungId/pdf
- * ------------------------------------------
- * Sucht die zur Buchungs-ID gehörende Rechnung und rendert das PDF.
+ * Sucht die zur Buchungs-ID gehörende Rechnung und rendert das PDF -
+ * praktisch, wenn (wie z.B. auf dem Dashboard) nur die Buchungs-ID zur
+ * Hand ist, nicht die Rechnungs-ID.
  */
 router.get("/buchung/:buchungId/pdf", async (req, res) => {
   try {
-    const rechnung = await prisma.rechnungen.findFirst({
-      where: { buchung_id: Number(req.params.buchungId) },
-      ...MIT_VOLLSTAENDIGEN_BUCHUNGSDATEN,
-    });
+    const ergebnis = await rendereRechnungsPdf({ buchung_id: Number(req.params.buchungId) });
 
-    if (!rechnung) {
+    if (!ergebnis) {
       return res.status(404).json({ error: "Keine Rechnung für diese Buchung gefunden" });
     }
 
-    const pdfBuffer = await renderToBuffer(
-      React.createElement(RechnungDocument, { rechnung, buchung: rechnung.Buchungen })
-    );
-
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `inline; filename="Rechnung-${rechnung.rechnungs_nummer}.pdf"`
-    );
-    res.send(pdfBuffer);
+    sendeRechnungsPdf(res, ergebnis);
   } catch (err) {
     console.error("Fehler beim Erstellen der Rechnungs-PDF:", err);
     res.status(500).json({ error: "PDF konnte nicht erstellt werden" });

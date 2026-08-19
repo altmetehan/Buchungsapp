@@ -32,12 +32,22 @@ import { initWebSocket } from "./ws.js";
  *
  * Start: `node src/server.js` im backend-Ordner.
  */
+
+/** Express-App-Instanz - hält Middleware und Router-Registrierungen. */
 const app = express();
+
+/** Fester Port für REST-API und WebSocket (siehe Datei-Kommentar oben). */
 const PORT = 3001;
 
+// Erlaubt Cross-Origin-Requests vom Frontend (Vite-Dev-Server / nginx).
 app.use(cors());
+// Parst eingehende JSON-Bodies automatisch in req.body.
 app.use(express.json());
 
+// --- Ressourcen-Router einbinden ---
+// Jede Zeile bindet einen fachlichen Bereich unter seinem eigenen
+// "/api/..."-Präfix ein. Die eigentliche Logik (GET/POST/PUT/DELETE)
+// steckt jeweils in der importierten Router-Datei.
 app.use("/api/gaeste", gaesteRoutes);
 app.use("/api/buchungen", buchungenRoutes);
 app.use("/api/objekte", objekteRoutes);
@@ -45,6 +55,8 @@ app.use("/api/rechnungen", rechnungenRoutes);
 app.use("/api/einstellungen", einstellungenRoutes);
 app.use("/api/anfragen", anfragenRoutes);
 
+// Roher HTTP-Server, auf dem Express UND der WebSocket-Server
+// gemeinsam laufen (siehe Datei-Kommentar oben).
 const httpServer = createServer(app);
 initWebSocket(httpServer);
 
