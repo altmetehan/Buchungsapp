@@ -4,16 +4,17 @@ import { getLogoBase64 } from '../utils/pdfUtils.js';
 
 /**
  * @file RechnungDocument.js
- * @description PDF-Rechnungsvorlage im CI-konformen Unternehmensdesign (Beckhoff Automation).
- *              Generiert über `@react-pdf/renderer` eine druckreife A4-Rechnung mit
- *              dynamischen Rechnungspositionen, optionalen Zusatzleistungen (z. B. Bus),
- *              historisierten Preisanpassungen als Einzelposten sowie standardisiertem
+ * @description PDF-Belegvorlage („Information für die Buchhaltung“) im CI-konformen Unternehmensdesign (Beckhoff Automation).
+ *              Generiert über `@react-pdf/renderer` eine druckreife A4-Aufstellung mit
+ *              dynamischen Leistungspositionen, optionalen Zusatzleistungen (z. B. Bus),
+ *              historisierten Preisanpassungen als Einzelposten, automatischer steuerlicher
+ *              Aufschlüsselung (Netto-Leistung, Mehrwertsteuer, Ortstaxe) sowie standardisiertem
  *              Briefkopf, Fälligkeitsberechnung und dreispaltiger Fußzeile.
  * @module pdf/RechnungDocument
  */
 
 /**
- * Alias für React.createElement zur lesbareren deklarativen Baumkonstruktion ohne JSX-Zwang im Backend.
+ * Alias für React.createElement zur deklarativen Baumkonstruktion im Backend.
  * @type {Function}
  */
 const h = React.createElement;
@@ -191,14 +192,14 @@ const styles = StyleSheet.create({
     marginTop: 1.5,
   },
 
-  /* ---------------- Summenblock ---------------- */
+  /* ---------------- Summenblock & Steuern ---------------- */
   totalsSection: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     marginBottom: 16,
   },
   totalsTable: {
-    width: '45%',
+    width: '52%',
   },
   totalsRow: {
     flexDirection: 'row',
@@ -353,8 +354,8 @@ const formatDate = (dateVal) => {
 /**
  * @typedef {Object} Preisanpassung
  * @property {number|string} [id] - ID der Preisanpassung.
- * @property {number} alter_betrag - Rechnungsbetrag vor der Anpassung.
- * @property {number} neuer_betrag - Rechnungsbetrag nach der Anpassung.
+ * @property {number} alter_betrag - Betrag vor der Anpassung.
+ * @property {number} neuer_betrag - Betrag nach der Anpassung.
  * @property {string} grund - Begründung der Anpassung (z. B. Endreinigung, Nachberechnung).
  * @property {string|Date} erstellt_am - Zeitstempel der Durchführung.
  */
@@ -365,6 +366,8 @@ const formatDate = (dateVal) => {
  * @property {string} [anreise] - Anreisedatum (ISO oder DD.MM.YYYY).
  * @property {string} [abreise] - Abreisedatum (ISO oder DD.MM.YYYY).
  * @property {number} [preis] - Aktueller finaler Buchungsbetrag.
+ * @property {number} [erwachsene] - Anzahl der erwachsenen Gäste.
+ * @property {number} [kinder] - Anzahl der Kinder.
  * @property {Gast} [Gaeste] - Verknüpfte Gästedaten.
  * @property {Objekt} [Objekte] - Hauptobjekt der Buchung.
  * @property {Objekt} [ObjekteZusatz] - Optionales Zusatzobjekt (z. B. Kombi-Bus).
@@ -373,9 +376,9 @@ const formatDate = (dateVal) => {
 
 /**
  * @typedef {Object} Rechnung
- * @property {number|string} [id] - ID des Rechnungsdatensatzes.
- * @property {string} [rechnungs_nummer] - Generierte Rechnungsnummer (z. B. "RE-2026-0001").
- * @property {string} [rechnungs_datum] - Datum der Rechnungsausstellung.
+ * @property {number|string} [id] - ID des Datensatzes.
+ * @property {string} [rechnungs_nummer] - Belegnummer (z. B. "RE-2026-0001").
+ * @property {string} [rechnungs_datum] - Datum der Belegausstellung.
  * @property {string} [faelligkeits_datum] - Optionales fixes Fälligkeitsdatum.
  * @property {Buchung} [Buchungen] - Zugehörige Buchungsrelation.
  */
@@ -397,24 +400,32 @@ const formatDate = (dateVal) => {
  */
 
 /**
+ * @typedef {Object} Einstellungen
+ * @property {number} [ortstaxe] - Ortstaxe pro Person und Nacht in Euro (z. B. 2.0).
+ * @property {number} [mwst_ortstaxe] - Steuersatz auf die Ortstaxe in Prozent (z. B. 0).
+ * @property {number} [mwst_normal] - Regulärer Mehrwertsteuersatz in Prozent (z. B. 10).
+ */
+
+/**
  * @typedef {Object} RechnungDocumentProps
  * @property {Rechnung} [rechnung] - Rechnungsdatensatz aus der Datenbank.
  * @property {Buchung} [buchung] - Direkte Buchungsdaten (Fallback zu `rechnung.Buchungen`).
  * @property {Gast|null} [gast] - Gaststammdaten (Fallback zu `buchung.Gaeste`).
  * @property {Objekt|null} [objekt] - Stammdaten des Hauptobjekts (Fallback zu `buchung.Objekte`).
- * @property {string|null} [rechnungsNummer] - Explizite Rechnungsnummer zur Überschreibung.
- * @property {string|null} [rechnungsDatum] - Explizites Rechnungsdatum zur Überschreibung.
+ * @property {string|null} [rechnungsNummer] - Explizite Belegnummer zur Überschreibung.
+ * @property {string|null} [rechnungsDatum] - Explizites Belegdatum zur Überschreibung.
  * @property {string|null} [faelligkeitsDatum] - Explizites Fälligkeitsdatum zur Überschreibung.
  * @property {string|null} [logoSrc] - Base64-Data-URI oder Bild-URL des Firmenlogos.
  * @property {UnternehmensDaten} [unternehmensDaten] - Absender- und Unternehmensstammdaten.
+ * @property {Einstellungen} [einstellungen] - Konfigurierte Steuersätze und Ortstaxenwerte.
  */
 
 /**
  * RechnungDocument-Komponente.
  *
- * Erstellt ein standardisiertes PDF-Rechnungsdokument auf A4-Basis für Buchungen.
- * Berechnet automatisch Zwischensumme, Fälligkeitstermine und schlüsselt Hauptleistungen,
- * Zusatzleistungen sowie Preisanpassungen als Einzelpositionen auf.
+ * Erstellt ein standardisiertes PDF-Dokument („Information für die Buchhaltung“) auf A4-Basis.
+ * Schreibt die Positionen, Preisanpassungen sowie Netto-Betrag, Mehrwertsteuer und Ortstaxe
+ * übersichtlich auf.
  *
  * @component
  * @param {RechnungDocumentProps} props - Die Eigenschaften zur PDF-Generierung.
@@ -443,6 +454,7 @@ export function RechnungDocument({
     firmenbuch: 'FN 222233p, LG Feldkirch',
     uid: 'ATU 54127804',
   },
+  einstellungen = {},
 }) {
   // Absicherung des Logos: Übergebene Quelle oder System-Base64-Fallback
   const finalLogo = logoSrc || getLogoBase64();
@@ -452,12 +464,12 @@ export function RechnungDocument({
   const currentGast = gast || currentBuchung?.Gaeste || {};
   const currentObjekt = objekt || currentBuchung?.Objekte || {};
 
-  // Rechnungsmetadaten bestimmen
+  // Belegmetadaten bestimmen
   const rNr = rechnungsNummer || rechnung?.rechnungs_nummer || 'RE-2026-0001';
   const rDatum = rechnungsDatum || rechnung?.rechnungs_datum || currentBuchung?.abreise || new Date().toISOString().split('T')[0];
 
   /**
-   * Berechnet das Fälligkeitsdatum (standardmäßig Rechnungsdatum + 14 Tage).
+   * Berechnet das Fälligkeitsdatum (standardmäßig Belegdatum + 14 Tage).
    *
    * @function
    * @returns {string} Das formatierte Fälligkeitsdatum.
@@ -498,7 +510,7 @@ export function RechnungDocument({
   // Ursprungspreis vor allen nachträglichen Preisanpassungen bestimmen
   const urspruenglicherPreis = preisHistorie.length > 0 ? Number(preisHistorie[0].alter_betrag || 0) : gesamtpreis;
 
-  // Dynamischer Aufbau aller Rechnungspositionszeilen
+  // Dynamischer Aufbau aller Leistungspositionszeilen
   let pos = 1;
   const tableRows = [];
 
@@ -573,7 +585,7 @@ export function RechnungDocument({
 
   return h(
     Document,
-    { title: `Rechnung_${rNr}` },
+    { title: `Information_fuer_die_Buchhaltung_${rNr}` },
     h(
       Page,
       { size: 'A4', style: styles.page },
@@ -616,7 +628,7 @@ export function RechnungDocument({
           h(
             View,
             { style: styles.metaRow },
-            h(Text, { style: styles.metaLabel }, 'Rechnungsdatum:'),
+            h(Text, { style: styles.metaLabel }, 'Datum:'),
             h(Text, { style: styles.metaValue }, formatDate(rDatum))
           ),
           h(
@@ -628,7 +640,7 @@ export function RechnungDocument({
           h(
             View,
             { style: styles.metaRow },
-            h(Text, { style: styles.metaLabel }, 'Rechnungs-Nr.:'),
+            h(Text, { style: styles.metaLabel }, 'Beleg-Nr.:'),
             h(Text, { style: [styles.metaValue, { color: COLORS.primary }] }, rNr)
           ),
           h(
@@ -643,12 +655,11 @@ export function RechnungDocument({
       // ===================================================================
       // 3. ANREDE & DOKUMENTENTITEL
       // ===================================================================
-      h(Text, { style: styles.docTitle }, `Rechnung ${rNr}`),
+      h(Text, { style: styles.docTitle }, `Information für die Buchhaltung ${rNr}`),
       h(
         Text,
         { style: styles.introText },
-        `Sehr geehrte(r) ${currentGast?.anrede ? `${currentGast.anrede} ` : ''}${currentGast?.nachname || gastName},\n` +
-        'wir bedanken uns für Ihre Buchung und stellen Ihnen die vereinbarten Leistungen in Rechnung:'
+        "Diese Aufstellung dient als Information für Ihre Buchhaltung:"
       ),
 
       // ===================================================================
@@ -670,42 +681,109 @@ export function RechnungDocument({
       ),
 
       // ===================================================================
-      // 5. SUMMENBLOCK (ZWISCHENSUMME & ENDBETRAG)
+      // 5. SUMMEN & STEUERAUFSCHLÜSSELUNG (ORTSTAXE ZUSÄTZLICH)
       // ===================================================================
-      h(
-        View,
-        { style: styles.totalsSection, wrap: false },
-        h(
+      (() => {
+        const oSatz = typeof einstellungen?.ortstaxe === 'number' ? einstellungen.ortstaxe : parseFloat(einstellungen?.ortstaxe) || 0;
+        const mSatz = typeof einstellungen?.mwst_normal === 'number' ? einstellungen.mwst_normal : parseFloat(einstellungen?.mwst_normal) || 0;
+        const moSatz = typeof einstellungen?.mwst_ortstaxe === 'number' ? einstellungen.mwst_ortstaxe : parseFloat(einstellungen?.mwst_ortstaxe) || 0;
+
+        const startIso = currentBuchung?.anreise?.includes('.') ? currentBuchung.anreise.split('.').reverse().join('-') : currentBuchung?.anreise;
+        const endIso = currentBuchung?.abreise?.includes('.') ? currentBuchung.abreise.split('.').reverse().join('-') : currentBuchung?.abreise;
+        const an = new Date(startIso);
+        const ab = new Date(endIso);
+        
+        const naechte = (!isNaN(an.getTime()) && !isNaN(ab.getTime())) ? Math.max(1, Math.ceil(Math.abs(ab - an) / 86400000)) : 1;
+        
+        // Ortstaxe nur für Erwachsene (ab 14 Jahre)
+        const erwachsene = Number(currentBuchung?.erwachsene) || (currentBuchung?.erwachsene === 0 ? 0 : 1);
+        const ortstaxeGesamt = isWohnung ? (erwachsene * naechte * oSatz) : 0;
+        
+        // Buchungspreis ist regulärer Brutto-Preis -> MwSt. herausrechnen
+        const nettoLeistung = gesamtpreis / (1 + (mSatz / 100));
+        const mwstLeistung = gesamtpreis - nettoLeistung;
+
+        // MwSt. auf Ortstaxe (falls Satz > 0)
+        const mwstOrtstaxe = moSatz > 0 ? ortstaxeGesamt - (ortstaxeGesamt / (1 + (moSatz / 100))) : 0;
+
+        // Endbetrag = Buchungspreis (brutto) + Ortstaxe
+        const gesamtZahlbetrag = gesamtpreis + ortstaxeGesamt;
+
+        return h(
           View,
-          { style: styles.totalsTable },
+          { style: styles.totalsSection, wrap: false },
           h(
             View,
-            { style: styles.totalsRow },
-            h(Text, { style: styles.totalsLabel }, 'Zwischensumme:'),
-            h(Text, { style: styles.totalsValue }, formatCurrency(gesamtpreis))
-          ),
-          h(
-            View,
-            { style: styles.grandTotalRow },
-            h(Text, { style: styles.grandTotalLabel }, 'Gesamtbetrag:'),
-            h(Text, { style: styles.grandTotalValue }, formatCurrency(gesamtpreis))
+            { style: styles.totalsTable },
+            h(
+              View,
+              { style: styles.totalsRow },
+              h(Text, { style: styles.totalsLabel }, 'Netto-Leistung:'),
+              h(Text, { style: styles.totalsValue }, formatCurrency(nettoLeistung))
+            ),
+            h(
+              View,
+              { style: styles.totalsRow },
+              h(Text, { style: styles.totalsLabel }, `Zzgl. ${mSatz}% MwSt.:`),
+              h(Text, { style: styles.totalsValue }, formatCurrency(mwstLeistung))
+            ),
+            h(
+              View,
+              { style: styles.totalsRow },
+              h(Text, { style: styles.totalsLabel }, 'Zwischensumme Aufenthalt:'),
+              h(Text, { style: styles.totalsValue }, formatCurrency(gesamtpreis))
+            ),
+            isWohnung && ortstaxeGesamt > 0
+              ? h(
+                  View,
+                  { style: styles.totalsRow },
+                  h(Text, { style: styles.totalsLabel }, `Ortstaxe (${erwachsene} Erw. ab 14 J., ${formatCurrency(oSatz)}/Nacht):`),
+                  h(Text, { style: styles.totalsValue }, formatCurrency(ortstaxeGesamt))
+                )
+              : null,
+            isWohnung && moSatz > 0 && ortstaxeGesamt > 0
+              ? h(
+                  View,
+                  { style: styles.totalsRow },
+                  h(Text, { style: styles.totalsLabel }, `Darin enth. ${moSatz}% MwSt. auf Ortstaxe:`),
+                  h(Text, { style: styles.totalsValue }, formatCurrency(mwstOrtstaxe))
+                )
+              : null,
+            h(
+              View,
+              { style: styles.grandTotalRow },
+              h(Text, { style: styles.grandTotalLabel }, 'Gesamtbetrag:'),
+              h(Text, { style: styles.grandTotalValue }, formatCurrency(gesamtZahlbetrag))
+            )
           )
-        )
-      ),
+        );
+      })(),
 
       // ===================================================================
-      // 6. ZAHLUNGSZIEL & ÜBERWEISUNGSHINWEIS
+      // 6. ZAHLUNGSTEXT
       // ===================================================================
-      h(
-        View,
-        { style: styles.paymentTerms, wrap: false },
-        h(
-          Text,
-          { style: styles.paymentText },
-          `Bitte überweisen Sie den Rechnungsbetrag von ${formatCurrency(gesamtpreis)} bis zum ${calcFaelligkeit()} ` +
-          `unter Angabe der Rechnungsnummer ${rNr} auf unser unten angegebenes Bankkonto.`
-        )
-      ),
+      (() => {
+        const oSatz = typeof einstellungen?.ortstaxe === 'number' ? einstellungen.ortstaxe : parseFloat(einstellungen?.ortstaxe) || 0;
+        const startIso = currentBuchung?.anreise?.includes('.') ? currentBuchung.anreise.split('.').reverse().join('-') : currentBuchung?.anreise;
+        const endIso = currentBuchung?.abreise?.includes('.') ? currentBuchung.abreise.split('.').reverse().join('-') : currentBuchung?.abreise;
+        const an = new Date(startIso);
+        const ab = new Date(endIso);
+        const naechte = (!isNaN(an.getTime()) && !isNaN(ab.getTime())) ? Math.max(1, Math.ceil(Math.abs(ab - an) / 86400000)) : 1;
+        const erwachsene = Number(currentBuchung?.erwachsene) || (currentBuchung?.erwachsene === 0 ? 0 : 1);
+        const ortstaxeGesamt = isWohnung ? (erwachsene * naechte * oSatz) : 0;
+        const gesamtZahlbetrag = gesamtpreis + ortstaxeGesamt;
+
+        return h(
+          View,
+          { style: styles.paymentTerms, wrap: false },
+          h(
+            Text,
+            { style: styles.paymentText },
+            `Bitte überweisen Sie den Gesamtbetrag von ${formatCurrency(gesamtZahlbetrag)} bis zum ${calcFaelligkeit()} ` +
+            `unter Angabe der Belegnummer ${rNr} auf unser unten angegebenes Bankkonto.`
+          )
+        );
+      })(),
 
       // ===================================================================
       // 7. FUSSZEILE (DREISPALTIG AUSGERICHTET)

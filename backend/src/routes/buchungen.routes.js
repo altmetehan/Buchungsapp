@@ -327,22 +327,24 @@ router.get("/oeffentlich", async (req, res) => {
  */
 router.get("/:id/pdf", async (req, res) => {
   try {
-    const { id } = req.params;
-    const buchung = await prisma.buchungen.findUnique({
-      where: { id: parseInt(id) },
-      include: {
-        Gaeste: true,
-        Objekte: true,
-        ObjekteZusatz: true,
-      },
-    });
+    const [buchung, einstellungen] = await Promise.all([
+      prisma.buchungen.findUnique({
+        where: { id: Number(req.params.id) },
+        include: {
+          Gaeste: true,
+          Objekte: true,
+          ObjekteZusatz: true,
+        },
+      }),
+      prisma.einstellungen.findFirst(),
+    ]);
 
     if (!buchung) {
       return res.status(404).json({ error: "Buchung nicht gefunden" });
     }
 
     const pdfBuffer = await renderToBuffer(
-      React.createElement(BuchungsbestaetigungDocument, { buchung })
+      React.createElement(BuchungsbestaetigungDocument, { buchung, einstellungen: einstellungen || {} })
     );
 
     res.setHeader("Content-Type", "application/pdf");

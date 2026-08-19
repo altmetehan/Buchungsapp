@@ -75,32 +75,35 @@ function baueRechnungUpdateDaten(body) {
 
 /**
  * Rendert eine Rechnung (per rechnungs_id ODER buchung_id gefunden) zu
- * einem PDF-Buffer. Zentrale Hilfsfunktion für beide PDF-Routen unten,
- * damit die Render-Logik nicht doppelt gepflegt werden muss.
+ * einem PDF-Buffer inkl. konfigurierter Steuersätze (Ortstaxe, MwSt.).
  *
- * @param {{where: object}} query - Prisma-"where"-Bedingung, um genau eine Rechnung zu finden
+ * @param {object} where - Prisma-"where"-Bedingung, um genau eine Rechnung zu finden
  * @returns {Promise<{rechnung: object, pdfBuffer: Buffer}|null>} null, falls keine passende Rechnung existiert
  */
 async function rendereRechnungsPdf(where) {
-  const rechnung = await prisma.rechnungen.findFirst({
-    where,
-    ...MIT_VOLLSTAENDIGEN_BUCHUNGSDATEN,
-  });
+  const [rechnung, einstellungen] = await Promise.all([
+    prisma.rechnungen.findFirst({
+      where,
+      ...MIT_VOLLSTAENDIGEN_BUCHUNGSDATEN,
+    }),
+    prisma.einstellungen.findFirst(),
+  ]);
 
   if (!rechnung) return null;
 
   const pdfBuffer = await renderToBuffer(
-    React.createElement(RechnungDocument, { rechnung, buchung: rechnung.Buchungen })
+    React.createElement(RechnungDocument, {
+      rechnung,
+      buchung: rechnung.Buchungen,
+      einstellungen: einstellungen || {},
+    })
   );
 
   return { rechnung, pdfBuffer };
 }
 
 /**
- * Schickt einen fertig gerenderten Rechnungs-PDF-Buffer als
- * "inline"-Antwort raus (öffnet im Browser-Tab statt sofort
- * herunterzuladen; von dort lässt sie sich trotzdem ganz normal
- * abspeichern).
+ * Schickt einen fertig gerenderten Beleg-PDF-Buffer als "inline"-Antwort raus.
  *
  * @param {import("express").Response} res
  * @param {{rechnung: object, pdfBuffer: Buffer}} ergebnis
@@ -108,7 +111,10 @@ async function rendereRechnungsPdf(where) {
  */
 function sendeRechnungsPdf(res, { rechnung, pdfBuffer }) {
   res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `inline; filename="Rechnung-${rechnung.rechnungs_nummer}.pdf"`);
+  res.setHeader(
+    "Content-Disposition",
+    `inline; filename="Information-fuer-die-Buchhaltung-${rechnung.rechnungs_nummer}.pdf"`
+  );
   res.send(pdfBuffer);
 }
 

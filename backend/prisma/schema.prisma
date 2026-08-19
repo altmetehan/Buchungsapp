@@ -70,6 +70,9 @@ model Einstellungen {
   kombirabatt             Float?  @default(0)
   checkin_wochentag       String? @default("")
   checkout_wochentag      String? @default("")
+  ortstaxe                Float?  @default(2.00)
+  mwst_ortstaxe           Float?  @default(0)
+  mwst_normal             Float?  @default(10)
 }
 
 model Preisanpassungen {

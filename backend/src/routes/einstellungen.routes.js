@@ -57,6 +57,9 @@ router.put("/", async (req, res) => {
       kombirabatt,
       checkin_wochentag,
       checkout_wochentag,
+      ortstaxe,
+      mwst_ortstaxe,
+      mwst_normal,
     } = req.body;
 
     const updated = await prisma.einstellungen.upsert({
@@ -68,6 +71,9 @@ router.put("/", async (req, res) => {
         kombirabatt,
         checkin_wochentag: checkin_wochentag || "",
         checkout_wochentag: checkout_wochentag || "",
+        ortstaxe: parseFloat(ortstaxe) || 0,
+        mwst_ortstaxe: parseFloat(mwst_ortstaxe) || 0,
+        mwst_normal: parseFloat(mwst_normal) || 0,
       },
       create: {
         id: 1,

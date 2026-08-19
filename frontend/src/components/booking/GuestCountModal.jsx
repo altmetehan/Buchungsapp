@@ -51,7 +51,7 @@ export function GuestCountModal({ isOpen, initialAdults, initialChildren, onClos
           <div style={{ ...stepperRowStyle, borderBottom: "1px solid #e4e4e7" }}>
             <div>
               <p className="detail-primary-text" style={{ marginBottom: 0 }}>Erwachsene</p>
-              <p className="detail-secondary-text">Ab 13 Jahren</p>
+              <p className="detail-secondary-text">Ab 14 Jahren</p>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
               <button
@@ -80,7 +80,7 @@ export function GuestCountModal({ isOpen, initialAdults, initialChildren, onClos
           <div style={stepperRowStyle}>
             <div>
               <p className="detail-primary-text" style={{ marginBottom: 0 }}>Kinder</p>
-              <p className="detail-secondary-text">0 bis 12 Jahre</p>
+              <p className="detail-secondary-text">0 bis 13 Jahre</p>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
               <button

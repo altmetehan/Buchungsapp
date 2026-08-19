@@ -63,7 +63,7 @@ export function Buchen() {
               <p className="anfragen-success-desc">
                 Die Buchung für <strong>{vm.angenommeneBuchungErfolg.gastName}</strong> wurde erfasst.
                 {vm.angenommeneBuchungErfolg.rechnungsNummer && (
-                  <> Die Rechnung <strong>{vm.angenommeneBuchungErfolg.rechnungsNummer}</strong> wurde automatisch erstellt. </>
+                  <> Die Information für die Buchhaltung <strong>{vm.angenommeneBuchungErfolg.rechnungsNummer}</strong> wurde automatisch erstellt. </>
                 )}
                 <br />
                 Sie können die Dokumente jetzt direkt herunterladen.
@@ -90,7 +90,7 @@ export function Buchen() {
                       window.open(`${RECHNUNGEN_API}/${vm.angenommeneBuchungErfolg.rechnungId}/pdf`, "_blank")
                     }
                   >
-                    Rechnung (PDF)
+                    Information für die Buchhaltung (PDF)
                   </button>
                 )}
 

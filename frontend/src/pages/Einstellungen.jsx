@@ -116,6 +116,9 @@ export function Einstellungen() {
           kombirabatt: parseFloat(form.kombirabatt) || 0,
           checkin_wochentag: form.checkin_wochentag || "",
           checkout_wochentag: form.checkout_wochentag || "",
+          ortstaxe: parseFloat(form.ortstaxe) || 0,
+          mwst_ortstaxe: parseFloat(form.mwst_ortstaxe) || 0,
+          mwst_normal: parseFloat(form.mwst_normal) || 0,
         }),
       });
       if (!response.ok) throw new Error("Speichern fehlgeschlagen");
@@ -140,74 +143,134 @@ export function Einstellungen() {
         <div className="header-text">
           <h2>Einstellungen</h2>
           <p className="subtitle">
-            Zentrale Werte für Wohnungsbuchungen - gelten ab sofort überall in der App.
+            Zentrale Werte für Buchungen und Buchhaltungsbelege.
           </p>
         </div>
       </div>
 
       {apiError && <p style={{ color: "#e30000", marginBottom: "16px" }}>{apiError}</p>}
 
-      <form onSubmit={handleSave} className="form-card" style={{ maxWidth: "650px" }}>
-        <h4 style={{ marginBottom: "8px" }}>Zentrale Einstellungen für die Wohnungen</h4>
-        <div className="form-grid">
-          <TimeDropdown
-            label="Check-in-Zeit"
-            value={form.checkin_zeit}
-            onChange={(val) => setForm({ ...form, checkin_zeit: val })}
-          />
-          <TimeDropdown
-            label="Check-out-Zeit"
-            value={form.checkout_zeit}
-            onChange={(val) => setForm({ ...form, checkout_zeit: val })}
-          />
+      <form onSubmit={handleSave} style={{ maxWidth: "1150px" }}>
+        {/* 2-Spalten-Container */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: "24px", alignItems: "start" }}>
+          
+          {/* Linke Box: Wohnungen */}
+          <div className="form-card">
+            <h4 style={{ marginBottom: "16px" }}>Zentrale Einstellungen für die Wohnungen</h4>
+            <div className="form-grid">
+              <TimeDropdown
+                label="Check-in-Zeit"
+                value={form.checkin_zeit}
+                onChange={(val) => setForm({ ...form, checkin_zeit: val })}
+              />
+              <TimeDropdown
+                label="Check-out-Zeit"
+                value={form.checkout_zeit}
+                onChange={(val) => setForm({ ...form, checkout_zeit: val })}
+              />
 
-          <WeekdayDropdown
-            label="Check-in nur am Wochentag"
-            value={form.checkin_wochentag || ""}
-            onChange={handleCheckinWochentagChange}
-            hint="z. B. „Freitag“ auswählen, falls Anreisen nur freitags erlaubt sind."
-          />
+              <WeekdayDropdown
+                label="Check-in nur am Wochentag"
+                value={form.checkin_wochentag || ""}
+                onChange={handleCheckinWochentagChange}
+                hint="z. B. „Freitag“ auswählen, falls Anreisen nur freitags erlaubt sind."
+              />
 
-          <WeekdayDropdown
-            label="Check-out nur am Wochentag"
-            value={form.checkout_wochentag || ""}
-            onChange={handleCheckoutWochentagChange}
-            hint="z. B. „Freitag“ auswählen, falls Abreisen nur freitags erlaubt sind."
-          />
+              <WeekdayDropdown
+                label="Check-out nur am Wochentag"
+                value={form.checkout_wochentag || ""}
+                onChange={handleCheckoutWochentagChange}
+                hint="z. B. „Freitag“ auswählen, falls Abreisen nur freitags erlaubt sind."
+              />
 
-          <div className="input-group full-width">
-            <label>Mindestanzahl Nächte pro Wohnungsbuchung *</label>
-            <input
-              type="number"
-              min="1"
-              step="1"
-              required
-              value={form.mindest_naechte_wohnung}
-              onChange={(e) => setForm({ ...form, mindest_naechte_wohnung: e.target.value })}
-            />
-            <span style={{ fontSize: "12px", color: "#71717a", marginTop: "4px" }}>
-              Wird bei Wochentagsänderung (z. B. Freitag bis Freitag) automatisch als Vorschlag angepasst, bleibt aber jederzeit frei editierbar.
-            </span>
+              <div className="input-group full-width">
+                <label>Mindestanzahl Nächte pro Wohnungsbuchung *</label>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  required
+                  value={form.mindest_naechte_wohnung ?? 1}
+                  onChange={(e) => setForm({ ...form, mindest_naechte_wohnung: e.target.value })}
+                />
+                <span style={{ fontSize: "12px", color: "#71717a", marginTop: "4px" }}>
+                  Wird bei Wochentagsänderung automatisch als Vorschlag angepasst.
+                </span>
+              </div>
+
+              <div className="input-group full-width">
+                <label>Kombi-Rabatt bei Zusatzbuchung von einem Bus (%) *</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  required
+                  value={form.kombirabatt ?? 0}
+                  onChange={(e) => setForm({ ...form, kombirabatt: e.target.value })}
+                />
+                <span style={{ fontSize: "12px", color: "#71717a", marginTop: "4px" }}>
+                  Rabatt auf den Bus-Aufpreis bei Kombibuchung.
+                </span>
+              </div>
+            </div>
           </div>
 
-          <div className="input-group full-width">
-            <label>Kombi-Rabatt bei Zusatzbuchung von einem Bus (%) *</label>
-            <input
-              type="number"
-              min="0"
-              max="100"
-              step="0.01"
-              required
-              value={form.kombirabatt}
-              onChange={(e) => setForm({ ...form, kombirabatt: e.target.value })}
-            />
-            <span style={{ fontSize: "12px", color: "#71717a", marginTop: "4px" }}>
-              Dieser Rabatt wird vom gesamten zusätzlichen Bus-Aufpreis abgezogen.
-            </span>
+          {/* Rechte Box: Buchhaltung & Steuern */}
+          <div className="form-card">
+            <h4 style={{ marginBottom: "16px" }}>Buchhaltung & Steuern</h4>
+            <div className="form-grid">
+              <div className="input-group full-width">
+                <label>Ortstaxe pro Person / Nacht (€)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="z. B. 2.50"
+                  value={form.ortstaxe ?? ""}
+                  onChange={(e) => setForm({ ...form, ortstaxe: e.target.value })}
+                />
+                <span style={{ fontSize: "12px", color: "#71717a", marginTop: "4px" }}>
+                  Wird auf Belegen für Wohnungen separat pro Gast und Nacht ausgewiesen.
+                </span>
+              </div>
+
+              <div className="input-group full-width">
+                <label>MwSt. auf Ortstaxe (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  placeholder="z. B. 0 oder 10"
+                  value={form.mwst_ortstaxe ?? ""}
+                  onChange={(e) => setForm({ ...form, mwst_ortstaxe: e.target.value })}
+                />
+                <span style={{ fontSize: "12px", color: "#71717a", marginTop: "4px" }}>
+                  Steuersatz auf die Ortstaxe (in Österreich meist 0%).
+                </span>
+              </div>
+
+              <div className="input-group full-width">
+                <label>Normale Mehrwertsteuer (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  placeholder="z. B. 10 oder 20"
+                  value={form.mwst_normal ?? ""}
+                  onChange={(e) => setForm({ ...form, mwst_normal: e.target.value })}
+                />
+                <span style={{ fontSize: "12px", color: "#71717a", marginTop: "4px" }}>
+                  Regulärer Steuersatz für Beherbergung/Nutzung.
+                </span>
+              </div>
+            </div>
           </div>
+
         </div>
 
-        <div className="wizard-actions" style={{ marginTop: "24px" }}>
+        {/* Speichern Button */}
+        <div className="wizard-actions" style={{ marginTop: "24px", display: "flex", justifyContent: "flex-end" }}>
           <button type="submit" className="btn-primary" disabled={isSaving}>
             {isSaving ? "Speichert..." : "Einstellungen speichern"}
           </button>

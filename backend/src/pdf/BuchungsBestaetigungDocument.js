@@ -4,47 +4,47 @@ import { getLogoBase64 } from '../utils/pdfUtils.js';
 
 /**
  * @file BuchungsBestaetigungDocument.js
- * @description PDF-Vorlage für verbindliche Buchungsbestätigungen im CI-konformen Unternehmensdesign (Beckhoff Automation).
+ * @description PDF-Vorlage für verbindliche Buchungsbestätigungen im CI-konformen Unternehmensdesign (Beckhoff Automation)[cite: 4].
  *              Generiert über `@react-pdf/renderer` eine druckreife A4-Bestätigung mit
- *              dynamischer Unterscheidung zwischen Ferienwohnungen und stundenbasierten Fahrzeugen/Bussen
- *              (Check-in/Check-out vs. Abholung/Rückgabe), Leistungstabelle, Nutzungs- und
- *              Schlüsselübergabe-Hinweisen sowie standardisiertem Absender- und dreispaltigem Fußzeilenbereich.
+ *              Leistungstabelle, automatischer steuerlicher Aufschlüsselung (Netto-Leistung,
+ *              Mehrwertsteuer, Ortstaxe für Erwachsene ab 14 Jahren), Hinweisen nach Objekttyp
+ *              (Wohnung vs. Fahrzeug) sowie dreispaltiger Fußzeile[cite: 4, 26].
  * @module pdf/BuchungsBestaetigungDocument
  */
 
 /**
- * Alias für React.createElement zur lesbaren und performanten Baumkonstruktion im Backend.
+ * Alias für React.createElement zur deklarativen Baumkonstruktion im Backend[cite: 4].
  * @type {Function}
  */
 const h = React.createElement;
 
 /**
- * Farbpalette für das PDF-Dokumentenlayout (Beckhoff-Design).
+ * Farbpalette für das PDF-Dokumentenlayout (Beckhoff-Design)[cite: 4].
  * @constant
  * @type {Object.<string, string>}
  */
 const COLORS = {
-  primary: '#E30000',       // Beckhoff Rot (Akzentfarbe)
-  textPrimary: '#18181B',   // Tiefes Anthrazit für Überschriften und Haupttext
-  textSecondary: '#52525B', // Neutrales Dunkelgrau für Beschreibungen und Fließtext
-  textMuted: '#8E8E93',     // Dezent für Metadaten und Hilfslinien
-  borderLight: '#E4E4E7',   // Helle Trennlinien
-  borderDark: '#27272A',    // Dunkle Akzenttrennlinien (Tabellenkopf / Summenbereich)
-  white: '#FFFFFF',         // Hintergrundfarbe
+  primary: '#E30000',       // Beckhoff Rot (Akzentfarbe)[cite: 4]
+  textPrimary: '#18181B',   // Tiefes Anthrazit für Überschriften und Haupttext[cite: 4]
+  textSecondary: '#52525B', // Neutrales Dunkelgrau für Beschreibungen und Fließtext[cite: 4]
+  textMuted: '#8E8E93',     // Dezent für Metadaten und Hilfslinien[cite: 4]
+  borderLight: '#E4E4E7',   // Helle Trennlinien[cite: 4]
+  borderDark: '#27272A',    // Dunkle Akzenttrennlinien[cite: 4]
+  white: '#FFFFFF',         // Hintergrundfarbe[cite: 4]
 };
 
 /**
- * StyleSheet-Definitionen für das typografische Raster und Flexbox-Layout der PDF-Seite.
+ * StyleSheet-Definitionen für das typografische Raster und Flexbox-Layout der PDF-Seite[cite: 4].
  */
 const styles = StyleSheet.create({
   page: {
     fontFamily: 'Helvetica',
-    fontSize: 9.5,
-    lineHeight: 1.5,
+    fontSize: 7.5,
+    lineHeight: 1.4,
     color: COLORS.textPrimary,
-    paddingTop: 40,
-    paddingBottom: 85,
-    paddingHorizontal: 45,
+    paddingTop: 35,
+    paddingBottom: 70,
+    paddingHorizontal: 40,
     backgroundColor: COLORS.white,
   },
 
@@ -53,16 +53,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 28,
+    marginBottom: 20,
   },
   logo: {
-    width: 140,
-    height: 38,
+    width: 120,
+    height: 32,
     objectFit: 'contain',
   },
   brandTextFallback: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 18,
+    fontSize: 15,
     color: COLORS.primary,
     letterSpacing: 0.5,
   },
@@ -71,11 +71,11 @@ const styles = StyleSheet.create({
   },
   companyNameHeader: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 10,
+    fontSize: 8.5,
     color: COLORS.textPrimary,
   },
   companySubHeader: {
-    fontSize: 8,
+    fontSize: 7,
     color: COLORS.textMuted,
     marginTop: 2,
   },
@@ -84,29 +84,29 @@ const styles = StyleSheet.create({
   letterHeadRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 28,
-    minHeight: 105,
+    marginBottom: 20,
+    minHeight: 85,
   },
   addressCol: {
     width: '55%',
   },
   senderSmall: {
-    fontSize: 7.5,
+    fontSize: 6.5,
     color: COLORS.textMuted,
-    marginBottom: 10,
+    marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
   recipientName: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 10.5,
+    fontSize: 8.5,
     color: COLORS.textPrimary,
     marginBottom: 2,
   },
   recipientLine: {
-    fontSize: 9.5,
+    fontSize: 7.5,
     color: COLORS.textPrimary,
-    lineHeight: 1.35,
+    lineHeight: 1.3,
   },
   metaCol: {
     width: '40%',
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
   metaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 2.5,
+    paddingVertical: 2,
     paddingBottom: 0,
     borderBottomWidth: 0.5,
     borderBottomColor: COLORS.textMuted,
@@ -123,15 +123,15 @@ const styles = StyleSheet.create({
   metaRowLast: {    
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 2.5,
+    paddingVertical: 2,
     paddingBottom: 0,
   },
   metaLabel: {
-    fontSize: 8.5,
+    fontSize: 7,
     color: COLORS.textSecondary,
   },
   metaValue: {
-    fontSize: 8.5,
+    fontSize: 7,
     fontFamily: 'Helvetica-Bold',
     color: COLORS.textPrimary,
   },
@@ -139,39 +139,39 @@ const styles = StyleSheet.create({
   /* ---------------- Anrede & Titel ---------------- */
   docTitle: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 15,
+    fontSize: 12,
     color: COLORS.textPrimary,
     marginBottom: 8,
   },
   introText: {
-    fontSize: 9.5,
+    fontSize: 7.5,
     color: COLORS.textSecondary,
-    marginBottom: 18,
-    lineHeight: 1.4,
+    marginBottom: 14,
+    lineHeight: 1.35,
   },
 
   /* ---------------- Leistungstabelle ---------------- */
   table: {
     width: '100%',
-    marginBottom: 18,
+    marginBottom: 12,
   },
   tableHeader: {
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: COLORS.borderDark,
-    paddingBottom: 6,
+    paddingBottom: 4,
     paddingHorizontal: 2,
   },
   th: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 8.5,
+    fontSize: 7,
     color: COLORS.textPrimary,
   },
   tableRow: {
     flexDirection: 'row',
     borderBottomWidth: 0.5,
     borderBottomColor: COLORS.borderLight,
-    paddingVertical: 9,
+    paddingVertical: 6,
     paddingHorizontal: 2,
   },
   colObj: { width: '45%' },
@@ -179,71 +179,91 @@ const styles = StyleSheet.create({
   colPrice: { width: '20%', textAlign: 'right' },
   itemTitle: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 9.5,
+    fontSize: 7.5,
     color: COLORS.textPrimary,
   },
   itemSubtitle: {
-    fontSize: 8,
+    fontSize: 6.5,
     color: COLORS.textSecondary,
-    marginTop: 2,
+    marginTop: 1.5,
   },
 
-  /* ---------------- Summenzeile ---------------- */
-  totalLine: {
+  /* ---------------- Summenblock & Steuern ---------------- */
+  totalsSection: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: 16,
+  },
+  totalsTable: {
+    width: '52%',
+  },
+  totalsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 2,
+  },
+  totalsLabel: {
+    fontSize: 7.5,
+    color: COLORS.textSecondary,
+  },
+  totalsValue: {
+    fontSize: 7.5,
+    color: COLORS.textPrimary,
+  },
+  grandTotalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     borderTopWidth: 1,
     borderTopColor: COLORS.borderDark,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.borderDark,
-    paddingVertical: 6,
-    paddingHorizontal: 2,
-    marginBottom: 22,
+    marginTop: 4,
+    paddingVertical: 4,
   },
-  totalLineLabel: {
+  grandTotalLabel: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 10,
+    fontSize: 8.5,
     color: COLORS.textPrimary,
   },
-  totalLineValue: {
+  grandTotalValue: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 10.5,
+    fontSize: 9,
     color: COLORS.primary,
   },
 
   /* ---------------- Hinweise & Bulletpoints ---------------- */
   detailsHeading: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 10,
+    fontSize: 8.5,
     color: COLORS.textPrimary,
-    marginBottom: 8,
+    marginBottom: 6,
     borderBottomWidth: 0.5,
     borderBottomColor: COLORS.borderLight,
-    paddingBottom: 4,
+    paddingBottom: 3,
   },
   bulletRow: {
     flexDirection: 'row',
-    marginBottom: 6,
-    paddingLeft: 4,
+    marginBottom: 5,
+    paddingLeft: 2,
   },
   bulletDot: {
-    width: 14,
+    width: 10,
     color: COLORS.primary,
     fontFamily: 'Helvetica-Bold',
-    fontSize: 10,
+    fontSize: 8.5,
   },
   bulletContent: {
     flex: 1,
   },
   bulletTitle: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 9,
+    fontSize: 7.5,
     color: COLORS.textPrimary,
   },
   bulletText: {
-    fontSize: 8.5,
+    fontSize: 7,
     color: COLORS.textSecondary,
-    lineHeight: 1.35,
+    lineHeight: 1.3,
     marginTop: 1,
   },
 
@@ -275,28 +295,28 @@ const styles = StyleSheet.create({
   },
   footerHeading: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 7.5,
+    fontSize: 6.5,
     color: COLORS.textPrimary,
-    marginBottom: 3,
+    marginBottom: 2,
   },
   footerText: {
-    fontSize: 7,
+    fontSize: 6,
     color: COLORS.textSecondary,
-    lineHeight: 1.35,
+    lineHeight: 1.25,
   },
   pageNumber: {
-    fontSize: 7,
+    fontSize: 6,
     color: COLORS.textMuted,
-    marginTop: 4,
+    marginTop: 3,
   },
 });
 
 /**
- * Formatiert einen numerischen Betrag als österreichische/deutsche Währungsangabe (z. B. "1.234,50 €").
+ * Formatiert einen numerischen Betrag als österreichische/deutsche Währungsangabe (z. B. "1.234,50 €")[cite: 4].
  *
  * @function
- * @param {number|string} val - Der zu formatierende Geldbetrag.
- * @returns {string} Formatierter Währungsstring inklusive Euro-Zeichen.
+ * @param {number|string} val - Der zu formatierende Geldbetrag[cite: 4].
+ * @returns {string} Formatierter Währungsstring inklusive Euro-Zeichen[cite: 4].
  */
 const formatCurrency = (val) => {
   const num = typeof val === 'number' ? val : parseFloat(val) || 0;
@@ -304,11 +324,11 @@ const formatCurrency = (val) => {
 };
 
 /**
- * Wandelt ein Datum (als Date-Instanz, ISO-String oder deutsches Format) sicher in "DD.MM.YYYY" um.
+ * Wandelt ein Datum sicher in "DD.MM.YYYY" um[cite: 4].
  *
  * @function
- * @param {Date|string|null|undefined} dateVal - Der eingehende Datumswert.
- * @returns {string} Das formatierte Datum oder "-" bei ungültigem / fehlendem Wert.
+ * @param {Date|string|null|undefined} dateVal - Der eingehende Datumswert[cite: 4].
+ * @returns {string} Das formatierte Datum oder "-" bei ungültigem / fehlendem Wert[cite: 4].
  */
 const formatDate = (dateVal) => {
   if (!dateVal) return '-';
@@ -331,72 +351,77 @@ const formatDate = (dateVal) => {
 
 /**
  * @typedef {Object} Gast
- * @property {string} [name] - Vollständiger Name des Gastes.
- * @property {string} [vorname] - Vorname des Gastes.
- * @property {string} [nachname] - Nachname des Gastes.
- * @property {string} [strasse] - Straße der Anschrift.
- * @property {string} [hnr] - Hausnummer.
- * @property {string} [plz] - Postleitzahl.
- * @property {string} [stadt] - Wohnort / Stadt.
- * @property {string} [land] - Herkunftsland.
+ * @property {string} [name] - Name des Gastes[cite: 4].
+ * @property {string} [vorname] - Vorname[cite: 4].
+ * @property {string} [nachname] - Nachname[cite: 4].
+ * @property {string} [strasse] - Straße[cite: 4].
+ * @property {string} [hnr] - Hausnummer[cite: 4].
+ * @property {string} [plz] - PLZ[cite: 4].
+ * @property {string} [stadt] - Stadt[cite: 4].
+ * @property {string} [land] - Land[cite: 4].
  */
 
 /**
  * @typedef {Object} Objekt
- * @property {number|string} [id] - Eindeutige ID des Objekts.
- * @property {string} [name] - Bezeichnung der Einheit (z. B. "Wohnung 1", "Vito Bus").
- * @property {number} [preis] - Regulärer Preis pro Einheit.
+ * @property {number|string} [id] - Objekt-ID[cite: 4].
+ * @property {string} [name] - Objektname[cite: 4].
+ * @property {number} [preis] - Einzelpreis[cite: 4].
  */
 
 /**
  * @typedef {Object} Buchung
- * @property {number|string} [id] - Buchungsnummer / Referenz-ID.
- * @property {string} [anreise] - Anreisedatum (ISO oder DD.MM.YYYY).
- * @property {string} [abreise] - Abreisedatum (ISO oder DD.MM.YYYY).
- * @property {string} [anreise_zeit] - Beginn-Uhrzeit (HH:MM).
- * @property {string} [abreise_zeit] - Ende-Uhrzeit (HH:MM).
- * @property {number} [erwachsene] - Anzahl der Erwachsenen.
- * @property {number} [kinder] - Anzahl der Kinder.
- * @property {number} [preis] - Gesamtpreis der Buchung.
- * @property {string|Date} [erstellt_am] - Erstellungszeitpunkt der Buchung.
- * @property {Gast} [Gaeste] - Zugehörige Gästedaten.
- * @property {Objekt} [Objekte] - Hauptobjekt der Buchung.
- * @property {Objekt} [ObjekteZusatz] - Optionales Zusatzobjekt (z. B. Kombi-Bus).
+ * @property {number|string} [id] - Buchungs-ID[cite: 4].
+ * @property {string} [anreise] - Anreisedatum[cite: 4].
+ * @property {string} [abreise] - Abreisedatum[cite: 4].
+ * @property {string} [anreise_zeit] - Anreise-Uhrzeit[cite: 4].
+ * @property {string} [abreise_zeit] - Abreise-Uhrzeit[cite: 4].
+ * @property {number} [erwachsene] - Anzahl Erwachsene[cite: 4].
+ * @property {number} [kinder] - Anzahl Kinder[cite: 4].
+ * @property {number} [preis] - Buchungspreis (Aufenthalt)[cite: 4].
+ * @property {string|Date} [erstellt_am] - Erstellungsdatum[cite: 4].
+ * @property {Gast} [Gaeste] - Gastdaten[cite: 4].
+ * @property {Objekt} [Objekte] - Hauptobjekt[cite: 4].
+ * @property {Objekt} [ObjekteZusatz] - Zusatzobjekt[cite: 4].
  */
 
 /**
  * @typedef {Object} UnternehmensDaten
- * @property {string} name - Firmenname.
- * @property {string} strasse - Firmenadresse.
- * @property {string} plzOrt - PLZ und Ort.
- * @property {string} land - Land.
- * @property {string} email - Kontakt-E-Mail.
- * @property {string} telefon - Telefonnummer.
- * @property {string} web - Website-URL.
- * @property {string} firmenbuch - Firmenbuchnummer und Gerichtsstand.
- * @property {string} uid - UID-Nummer.
- * @property {string} [wlanSsid] - Name des Gäste-WLANs.
- * @property {string} [wlanPw] - Passwort für das Gäste-WLAN.
+ * @property {string} name - Firmenname[cite: 4].
+ * @property {string} strasse - Firmenadresse[cite: 4].
+ * @property {string} plzOrt - PLZ und Ort[cite: 4].
+ * @property {string} land - Land[cite: 4].
+ * @property {string} email - Kontakt-E-Mail[cite: 4].
+ * @property {string} telefon - Telefonnummer[cite: 4].
+ * @property {string} web - Website-URL[cite: 4].
+ * @property {string} firmenbuch - Firmenbuchnummer[cite: 4].
+ * @property {string} uid - UID-Nummer[cite: 4].
+ * @property {string} [wlanSsid] - WLAN Name[cite: 4].
+ * @property {string} [wlanPw] - WLAN Passwort[cite: 4].
+ */
+
+/**
+ * @typedef {Object} Einstellungen
+ * @property {number} [ortstaxe] - Ortstaxe pro Person und Nacht in Euro (z. B. 2.0)[cite: 26].
+ * @property {number} [mwst_ortstaxe] - Steuersatz auf die Ortstaxe in Prozent (z. B. 0)[cite: 26].
+ * @property {number} [mwst_normal] - Regulärer Mehrwertsteuersatz in Prozent (z. B. 10)[cite: 26].
  */
 
 /**
  * @typedef {Object} BuchungsbestaetigungDocumentProps
- * @property {Buchung} [buchung] - Buchungsdatensatz inklusive Relationen.
- * @property {Gast|null} [gast] - Gaststammdaten (Fallback zu `buchung.Gaeste`).
- * @property {Objekt|null} [objekt] - Objektstammdaten (Fallback zu `buchung.Objekte`).
- * @property {string|null} [logoSrc] - Base64-String oder Pfad zum Logo.
- * @property {UnternehmensDaten} [unternehmensDaten] - Absender- und Standortinformationen.
+ * @property {Buchung} [buchung] - Buchungsdatensatz inklusive Relationen[cite: 4].
+ * @property {Gast|null} [gast] - Gaststammdaten[cite: 4].
+ * @property {Objekt|null} [objekt] - Objektstammdaten[cite: 4].
+ * @property {string|null} [logoSrc] - Logo Data-URI[cite: 4].
+ * @property {UnternehmensDaten} [unternehmensDaten] - Absender- und Standortinformationen[cite: 4].
+ * @property {Einstellungen} [einstellungen] - Konfigurierte Steuersätze und Ortstaxenwerte[cite: 26].
  */
 
 /**
- * BuchungsbestaetigungDocument-Komponente.
- *
- * Rendert das PDF-Dokument für Buchungsbestätigungen mit automatischer
- * Erkennung des Buchungstyps (Wohnungsaufenthalt vs. Fahrzeugmiete).
+ * BuchungsbestaetigungDocument-Komponente[cite: 4].
  *
  * @component
- * @param {BuchungsbestaetigungDocumentProps} props - Komponenten-Properties.
- * @returns {JSX.Element} Das gerenderte React-PDF Document-Element.
+ * @param {BuchungsbestaetigungDocumentProps} props - Komponenten-Properties[cite: 4].
+ * @returns {JSX.Element} Das gerenderte React-PDF Document-Element[cite: 4].
  */
 export function BuchungsbestaetigungDocument({
   buchung = {},
@@ -416,6 +441,7 @@ export function BuchungsbestaetigungDocument({
     wlanSsid: 'Beckhoff_Gast',
     wlanPw: 'Willkommen2026',
   },
+  einstellungen = {},
 }) {
   const finalLogo = logoSrc || getLogoBase64();
   const currentGast = gast || buchung?.Gaeste || {};
@@ -432,14 +458,17 @@ export function BuchungsbestaetigungDocument({
   const gastAdresse = currentGast?.strasse ? `${currentGast.strasse} ${currentGast.hnr || ''}`.trim() : 'Musterstraße 1';
   const gastOrt = `${currentGast?.plz || '6700'} ${currentGast?.stadt || 'Bludenz'}`;
 
-  const personenGesamt =
-    (buchung?.erwachsene || 0) + (buchung?.kinder || 0) > 0
-      ? (buchung?.erwachsene || 0) + (buchung?.kinder || 0)
-      : 1;
+  const erwachsene = Number(buchung?.erwachsene) || (buchung?.erwachsene === 0 ? 0 : 1);
+  const kinder = Number(buchung?.kinder) || 0;
+  const gesamtpreis = Number(buchung?.preis || 0);
 
   const zeitenText = isWohnung
     ? `Check-in: ab ${checkinUhrzeit} Uhr | Check-out: bis ${checkoutUhrzeit} Uhr`
     : `Abholung: ab ${checkinUhrzeit} Uhr | Rückgabe: bis ${checkoutUhrzeit} Uhr`;
+
+  const personenText = isWohnung
+    ? `${erwachsene} Erw.${kinder > 0 ? ` · ${kinder} Kind. (< 14 J.)` : ''}`
+    : `${(buchung?.erwachsene || 0) + (buchung?.kinder || 0) || 1} Person(en)`;
 
   return h(
     Document,
@@ -449,7 +478,7 @@ export function BuchungsbestaetigungDocument({
       { size: 'A4', style: styles.page },
 
       // ===================================================================
-      // 1. KOPFBEREICH: Firmenlogo & Absender-Kurzangaben
+      // 1. KOPFBEREICH: Firmenlogo & Absender-Kurzangaben[cite: 4]
       // ===================================================================
       h(
         View,
@@ -466,7 +495,7 @@ export function BuchungsbestaetigungDocument({
       ),
 
       // ===================================================================
-      // 2. BRIEFFENSTER & METADATEN-CONTAINER
+      // 2. BRIEFFENSTER & METADATEN-CONTAINER[cite: 4]
       // ===================================================================
       h(
         View,
@@ -504,14 +533,14 @@ export function BuchungsbestaetigungDocument({
           h(
             View,
             { style: styles.metaRowLast },
-            h(Text, { style: styles.metaLabel }, isWohnung ? 'Personen:' : 'Fahrgäste:'),
-            h(Text, { style: styles.metaValue }, `${personenGesamt} Person(en)`)
+            h(Text, { style: styles.metaLabel }, isWohnung ? 'Gäste:' : 'Fahrgäste:'),
+            h(Text, { style: styles.metaValue }, personenText)
           )
         )
       ),
 
       // ===================================================================
-      // 3. ANREDE & DOKUMENTENTITEL
+      // 3. ANREDE & DOKUMENTENTITEL[cite: 4]
       // ===================================================================
       h(Text, { style: styles.docTitle }, `Buchungsbestätigung #${buchungId}`),
       h(
@@ -522,7 +551,7 @@ export function BuchungsbestaetigungDocument({
       ),
 
       // ===================================================================
-      // 4. LEISTUNGSTABELLE
+      // 4. LEISTUNGSTABELLE[cite: 4]
       // ===================================================================
       h(
         View,
@@ -548,12 +577,12 @@ export function BuchungsbestaetigungDocument({
             { style: styles.colZeit },
             h(
               Text,
-              { style: { fontFamily: 'Helvetica-Bold', fontSize: 9 } },
+              { style: { fontFamily: 'Helvetica-Bold', fontSize: 7.5 } },
               `${formatDate(buchung?.anreise)} – ${formatDate(buchung?.abreise)}`
             ),
             h(Text, { style: styles.itemSubtitle }, zeitenText)
           ),
-          h(Text, { style: styles.colPrice }, formatCurrency(buchung?.preis || 0))
+          h(Text, { style: styles.colPrice }, formatCurrency(gesamtpreis))
         ),
         buchung?.ObjekteZusatz
           ? h(
@@ -572,17 +601,85 @@ export function BuchungsbestaetigungDocument({
       ),
 
       // ===================================================================
-      // 5. GESAMTBETRAG
+      // 5. SUMMENBLOCK & STEUERAUFSCHLÜSSELUNG (ORTSTAXE & MWST)[cite: 26]
       // ===================================================================
-      h(
-        View,
-        { style: styles.totalLine },
-        h(Text, { style: styles.totalLineLabel }, 'Gesamtbetrag der Buchung:'),
-        h(Text, { style: styles.totalLineValue }, formatCurrency(buchung?.preis || 0))
-      ),
+      (() => {
+        const oSatz = typeof einstellungen?.ortstaxe === 'number' ? einstellungen.ortstaxe : parseFloat(einstellungen?.ortstaxe) || 0;
+        const mSatz = typeof einstellungen?.mwst_normal === 'number' ? einstellungen.mwst_normal : parseFloat(einstellungen?.mwst_normal) || 0;
+        const moSatz = typeof einstellungen?.mwst_ortstaxe === 'number' ? einstellungen.mwst_ortstaxe : parseFloat(einstellungen?.mwst_ortstaxe) || 0;
+
+        const startIso = buchung?.anreise?.includes('.') ? buchung.anreise.split('.').reverse().join('-') : buchung?.anreise;
+        const endIso = buchung?.abreise?.includes('.') ? buchung.abreise.split('.').reverse().join('-') : buchung?.abreise;
+        const an = new Date(startIso);
+        const ab = new Date(endIso);
+        
+        const naechte = (!isNaN(an.getTime()) && !isNaN(ab.getTime())) ? Math.max(1, Math.ceil(Math.abs(ab - an) / 86400000)) : 1;
+        
+        // Ortstaxe nur für Erwachsene (ab 14 Jahre)
+        const ortstaxeGesamt = isWohnung ? (erwachsene * naechte * oSatz) : 0;
+        
+        // Buchungspreis ist regulärer Brutto-Preis -> MwSt. herausrechnen
+        const nettoLeistung = gesamtpreis / (1 + (mSatz / 100));
+        const mwstLeistung = gesamtpreis - nettoLeistung;
+
+        // MwSt. auf Ortstaxe (falls Satz > 0)
+        const mwstOrtstaxe = moSatz > 0 ? ortstaxeGesamt - (ortstaxeGesamt / (1 + (moSatz / 100))) : 0;
+
+        // Endbetrag = Buchungspreis (brutto) + Ortstaxe
+        const gesamtZahlbetrag = gesamtpreis + ortstaxeGesamt;
+
+        return h(
+          View,
+          { style: styles.totalsSection, wrap: false },
+          h(
+            View,
+            { style: styles.totalsTable },
+            h(
+              View,
+              { style: styles.totalsRow },
+              h(Text, { style: styles.totalsLabel }, 'Netto-Leistung:'),
+              h(Text, { style: styles.totalsValue }, formatCurrency(nettoLeistung))
+            ),
+            h(
+              View,
+              { style: styles.totalsRow },
+              h(Text, { style: styles.totalsLabel }, `Zzgl. ${mSatz}% MwSt.:`),
+              h(Text, { style: styles.totalsValue }, formatCurrency(mwstLeistung))
+            ),
+            h(
+              View,
+              { style: styles.totalsRow },
+              h(Text, { style: styles.totalsLabel }, 'Zwischensumme Aufenthalt:'),
+              h(Text, { style: styles.totalsValue }, formatCurrency(gesamtpreis))
+            ),
+            isWohnung && ortstaxeGesamt > 0
+              ? h(
+                  View,
+                  { style: styles.totalsRow },
+                  h(Text, { style: styles.totalsLabel }, `Ortstaxe (${erwachsene} Erw. ab 14 J., ${formatCurrency(oSatz)}/Nacht):`),
+                  h(Text, { style: styles.totalsValue }, formatCurrency(ortstaxeGesamt))
+                )
+              : null,
+            isWohnung && moSatz > 0 && ortstaxeGesamt > 0
+              ? h(
+                  View,
+                  { style: styles.totalsRow },
+                  h(Text, { style: styles.totalsLabel }, `Darin enth. ${moSatz}% MwSt. auf Ortstaxe:`),
+                  h(Text, { style: styles.totalsValue }, formatCurrency(mwstOrtstaxe))
+                )
+              : null,
+            h(
+              View,
+              { style: styles.grandTotalRow },
+              h(Text, { style: styles.grandTotalLabel }, 'Gesamtbetrag:'),
+              h(Text, { style: styles.grandTotalValue }, formatCurrency(gesamtZahlbetrag))
+            )
+          )
+        );
+      })(),
 
       // ===================================================================
-      // 6. HINWEISE & ANWEISUNGEN (DYNAMISCH NACH OBJEKTTYP)
+      // 6. HINWEISE & ANWEISUNGEN (DYNAMISCH NACH OBJEKTTYP)[cite: 4]
       // ===================================================================
       h(
         View,
@@ -593,7 +690,7 @@ export function BuchungsbestaetigungDocument({
           isWohnung ? 'Informationen für Ihren Aufenthalt' : 'Informationen zur Fahrzeugnutzung'
         ),
 
-        // Punkt 1: Schlüsselübergabe / Fahrzeugübernahme
+        // Punkt 1: Schlüsselübergabe / Fahrzeugübernahme[cite: 4]
         h(
           View,
           { style: styles.bulletRow },
@@ -616,7 +713,7 @@ export function BuchungsbestaetigungDocument({
           )
         ),
 
-        // Punkt 2: Internet / Tankregelung
+        // Punkt 2: Internet / Tankregelung[cite: 4]
         h(
           View,
           { style: styles.bulletRow },
@@ -639,7 +736,7 @@ export function BuchungsbestaetigungDocument({
           )
         ),
 
-        // Punkt 3: Hausordnung / Rückgabebedingungen
+        // Punkt 3: Hausordnung / Rückgabebedingungen[cite: 4]
         h(
           View,
           { style: styles.bulletRow },
@@ -664,7 +761,7 @@ export function BuchungsbestaetigungDocument({
       ),
 
       // ===================================================================
-      // 7. FUSSZEILE (DREISPALTIG AUSGERICHTET)
+      // 7. FUSSZEILE (DREISPALTIG AUSGERICHTET)[cite: 4]
       // ===================================================================
       h(
         View,
@@ -696,6 +793,5 @@ export function BuchungsbestaetigungDocument({
   );
 }
 
-// Aliase für benannte Imports zur Vermeidung von Namenskonflikten
 export const BuchungsBestaetigungDocument = BuchungsbestaetigungDocument;
 export default BuchungsbestaetigungDocument;

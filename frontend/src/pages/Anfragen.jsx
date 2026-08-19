@@ -826,7 +826,7 @@ export function Anfragen() {
                       window.open(`${RECHNUNGEN_API}/${angenommeneBuchungErfolg.rechnungId}/pdf`, "_blank")
                     }
                   >
-                    Rechnung (PDF)
+                    Information für die Buchhaltung (PDF)
                   </button>
                 )}
 

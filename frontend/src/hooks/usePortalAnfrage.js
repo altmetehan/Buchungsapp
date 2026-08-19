@@ -400,8 +400,10 @@ export function usePortalAnfrage() {
 
       if (gueltigerZeitraum && wohnung && (!checkinPasst || !checkoutPasst)) {
         status = "nicht verfügbar";
-        if (!checkinPasst && !checkoutPasst && CHECKIN_WOCHENTAG === CHECKOUT_WOCHENTAG) {
-          info = `Nur ${CHECKIN_WOCHENTAG} bis ${CHECKOUT_WOCHENTAG} anfragbar`;
+        if (!checkinPasst && !checkoutPasst) {
+          info = CHECKIN_WOCHENTAG === CHECKOUT_WOCHENTAG
+            ? `Anreise und Abreise nur am ${CHECKIN_WOCHENTAG} möglich`
+            : `Anreise nur am ${CHECKIN_WOCHENTAG}, Abreise nur am ${CHECKOUT_WOCHENTAG} möglich`;
         } else if (!checkinPasst) {
           info = `Anreise nur am ${CHECKIN_WOCHENTAG} möglich`;
         } else {
