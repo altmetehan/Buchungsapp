@@ -20,11 +20,15 @@ const router = Router();
  * Vorher wurde hier direkt "data: req.body" an Prisma durchgereicht -
  * dadurch hätte ein Request theoretisch auch interne Felder wie "id"
  * oder "geloescht_am" mit-überschreiben können (Mass-Assignment). Die
- * explizite Feldliste hier schließt das aus: nur diese vier Werte
- * werden je aus dem Body übernommen, alles andere wird ignoriert.
+ * explizite Feldliste hier schließt das aus: nur diese Werte werden
+ * je aus dem Body übernommen, alles andere wird ignoriert.
+ *
+ * "oeffentlich" steuert, ob das Objekt im öffentlichen Portal
+ * (Belegungsplan + Anfrage-Seite) überhaupt sichtbar ist - Standard
+ * ist "nicht öffentlich" (0), falls das Feld fehlt.
  *
  * @param {object} body - req.body
- * @returns {{name: string, beschreibung: string|null, kennzeichen: string|null, preis: number}}
+ * @returns {{name: string, beschreibung: string|null, kennzeichen: string|null, preis: number, oeffentlich: number}}
  */
 function baueObjektDaten(body) {
   return {
@@ -32,12 +36,14 @@ function baueObjektDaten(body) {
     beschreibung: body.beschreibung ?? null,
     kennzeichen: body.kennzeichen ?? null,
     preis: body.preis,
+    oeffentlich: body.oeffentlich ? 1 : 0,
   };
 }
 
 /**
  * GET /api/objekte
- * Liefert alle aktiven (nicht gelöschten) Objekte.
+ * Liefert alle aktiven (nicht gelöschten) Objekte - für den internen
+ * Admin-Bereich, unabhängig vom "oeffentlich"-Status.
  */
 router.get("/", async (req, res) => {
   try {
@@ -51,9 +57,28 @@ router.get("/", async (req, res) => {
 });
 
 /**
+ * GET /api/objekte/oeffentlich
+ * Für die öffentliche Portal-Seite (Belegungsplan + Anfrage stellen):
+ * liefert NUR aktive Objekte, die explizit als öffentlich markiert
+ * wurden (oeffentlich = 1). Alles andere (z.B. interne Objekte) bleibt
+ * für Portal-Besucher komplett unsichtbar - nicht nur ausgeblendet,
+ * sondern gar nicht erst an den Client übertragen.
+ */
+router.get("/oeffentlich", async (req, res) => {
+  try {
+    const objekte = await prisma.objekte.findMany({
+      where: { geloescht_am: null, oeffentlich: 1 },
+    });
+    res.json(objekte);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * POST /api/objekte
  * Legt ein neues Objekt an. Erwartet im Body: name, beschreibung,
- * kennzeichen (optional), preis.
+ * kennzeichen (optional), preis, oeffentlich (optional, Standard false).
  */
 router.post("/", async (req, res) => {
   try {
@@ -67,7 +92,8 @@ router.post("/", async (req, res) => {
 
 /**
  * PUT /api/objekte/:id
- * Aktualisiert die Stammdaten eines bestehenden Objekts.
+ * Aktualisiert die Stammdaten eines bestehenden Objekts (inkl.
+ * "oeffentlich"-Status).
  */
 router.put("/:id", async (req, res) => {
   try {

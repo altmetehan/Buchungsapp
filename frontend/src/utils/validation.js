@@ -27,10 +27,10 @@ export const isEmail = (message = "Bitte eine gültige E-Mail-Adresse eingeben")
   return emailRegex.test(value) ? null : message;
 };
 
-export const isPositiveNumber = (message = "Bitte eine gültige positive Zahl eingeben") => (value) => {
+export const isNonNegativeNumber = (message = "Bitte eine gültige Zahl (0 oder größer) eingeben") => (value) => {
   if (value === "" || value === null || value === undefined) return null;
   const num = parseFloat(value.toString().replace(",", "."));
-  return !isNaN(num) && num > 0 ? null : message;
+  return !isNaN(num) && num >= 0 ? null : message;
 };
 
 export const minValue = (min, message) => (value) => {

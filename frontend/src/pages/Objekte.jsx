@@ -3,20 +3,21 @@ import "../styles/shared-ui.css";
 import "../styles/pageStyles/Objekte.css";
 import { Toast } from "../components/ui/Toast";
 import { useToast } from "../hooks/useToast";
-import { validateForm, required, isPositiveNumber } from "../utils/validation";
+import { validateForm, required, isNonNegativeNumber } from "../utils/validation";
 import { istWohnung } from "../utils/javaUtils";
 
 /**
  * @file Objekte.jsx
  * @description Verwaltung von Ferienunterkünften, Fahrzeugen und sonstigen Mietobjekten.
- *              Bietet Funktionen zur Pflege von Namen, Beschreibungen, KFZ-Kennzeichen und Preisen
- *              sowie Validierung und Löschschutz bei aktiven Belegungen.
+ *              Bietet Funktionen zur Pflege von Namen, Beschreibungen, KFZ-Kennzeichen,
+ *              Preisen sowie der öffentlichen Sichtbarkeit (Portal-Kalender & Anfrage-Seite),
+ *              inklusive Validierung und Löschschutz bei aktiven Belegungen.
  * @module pages/Objekte
  */
 
 const API_BASE = "/api/objekte";
 
-const LEERES_FORMULAR = { name: "", beschreibung: "", kennzeichen: "", preis: "" };
+const LEERES_FORMULAR = { name: "", beschreibung: "", kennzeichen: "", preis: "", oeffentlich: false };
 
 /**
  * Validierungsregeln für Objektstammdaten.
@@ -26,7 +27,7 @@ const LEERES_FORMULAR = { name: "", beschreibung: "", kennzeichen: "", preis: ""
 const OBJEKT_VALIDATION_RULES = {
   name: [required("Objektname ist erforderlich")],
   beschreibung: [required("Beschreibung ist erforderlich")],
-  preis: [required("Preis ist erforderlich"), isPositiveNumber()],
+  preis: [required("Preis ist erforderlich"), isNonNegativeNumber()],
 };
 
 /**
@@ -90,6 +91,7 @@ export function Objekte() {
       beschreibung: object.beschreibung || "",
       kennzeichen: object.kennzeichen || "",
       preis: object.preis?.toString() || "",
+      oeffentlich: Boolean(object.oeffentlich),
     });
     setIsModalOpen(true);
   };
@@ -120,6 +122,7 @@ export function Objekte() {
       beschreibung: newObject.beschreibung,
       kennzeichen: newObject.kennzeichen || null,
       preis: Math.round(preisZahl * 100) / 100,
+      oeffentlich: newObject.oeffentlich,
     };
 
     setIsSaving(true);
@@ -215,7 +218,8 @@ export function Objekte() {
           <span>Name</span>
           <span>Beschreibung</span>
           <span>Kennzeichen</span>
-          <span className="object-preis-header">Preis pro Stunde / Nacht</span>
+          <span className="object-oeffentlich-header">Öffentlich</span>
+          <span className="object-preis-header">Preis pro Nacht</span>
           <span></span>
         </div>
 
@@ -227,11 +231,18 @@ export function Objekte() {
                 <span className="object-name">{object.name}</span>
                 <span className="object-desc">{object.beschreibung}</span>
                 <span className="object-desc">{object.kennzeichen}</span>
-                <span className="object-preis">
+                <span
+                  className="object-oeffentlich"
+                  title={object.oeffentlich ? "Im Portal sichtbar" : "Im Portal nicht sichtbar"}
+                >
+                  {object.oeffentlich ? (
+                    <span style={{ color: "#2b9348", fontWeight: 700 }}>✓</span>
+                  ) : (
+                    <span style={{ color: "#a1a1aa" }}>—</span>
+                  )}
+                </span>
+                <span className="object-preis" style={object.preis === 0 ? { fontWeight: 400, color: "#8e8e93", fontSize: "12px" } : {}}>
                   {new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(object.preis)}{" "}
-                  <span style={{ fontWeight: 400, color: "#8e8e93", fontSize: "12px" }}>
-                    {istWohnung(object.name) ? "/ Nacht" : "/ Std."}
-                  </span>
                 </span>
                 <div className="row-actions">
                   <button className="btn-outline" onClick={() => handleOpenEditModal(object)}>
@@ -299,6 +310,26 @@ export function Objekte() {
                   />
                   {formErrors.preis && <span style={{ color: "#ef4444", fontSize: "12px" }}>{formErrors.preis}</span>}
                 </div>
+
+                <div
+                  className="input-group full-width"
+                  style={{ flexDirection: "row", alignItems: "center", gap: "10px" }}
+                >
+                  <input
+                    type="checkbox"
+                    id="oeffentlich-checkbox"
+                    checked={newObject.oeffentlich}
+                    onChange={(e) => setNewObject({ ...newObject, oeffentlich: e.target.checked })}
+                    style={{ width: "18px", height: "18px", cursor: "pointer" }}
+                  />
+                  <label htmlFor="oeffentlich-checkbox" style={{ marginBottom: 0, cursor: "pointer" }}>
+                    Öffentlich sichtbar (Portal-Belegungsplan &amp; Anfrage-Seite)
+                  </label>
+                </div>
+                <span style={{ fontSize: "12px", color: "#71717a", marginTop: "-12px", gridColumn: "span 2" }}>
+                  Nur öffentliche Objekte sind für Besucher unter /portal im Kalender wählbar und können dort
+                  angefragt werden.
+                </span>
               </div>
 
               <div className="modal-footer-flex">

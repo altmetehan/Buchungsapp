@@ -68,17 +68,17 @@
    ========================================================= */
 
 /* 1. CSS-Variablen pro Objekt-Typ definieren */
-.resource-wohnung-1 {
+.resource-wohnung-brandnertal {
   --res-bg: #e30000;      /* Beckhoff Rot */
   --res-border: #b80000;
 }
 
-.resource-wohnung-2 {
+.resource-wohnung-walsertal {
   --res-bg: #3b82f6;      /* Blau */
   --res-border: #1d4ed8;
 }
 
-.resource-wohnung-3 {
+.resource-wohnung-klostertal {
   --res-bg: #10b981;      /* Grün */
   --res-border: #047857;
 }
@@ -100,11 +100,10 @@
 }
 
 /* 2. FullCalendar-Events automatisch einfärben */
-.fc-event.resource-wohnung-1,
-.fc-event.resource-wohnung-2,
-.fc-event.resource-wohnung-3,
+.fc-event.resource-wohnung-brandnertal,
+.fc-event.resource-wohnung-walsertal,
+.fc-event.resource-wohnung-klostertal,
 .fc-event.resource-vito-bus,
-.fc-event.resource-forum-beckhoff,
 .fc-event.resource-default {
   background-color: var(--res-bg) !important;
   border-color: var(--res-border) !important;

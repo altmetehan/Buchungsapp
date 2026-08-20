@@ -20,7 +20,7 @@ import { istStundenbasiert, toISO, getResourceColor } from "../../utils/javaUtil
 const OEFFENTLICHE_BUCHUNGEN_API = "/api/buchungen/oeffentlich";
 
 /** Endpunkt für Objektstammdaten (Wohnungen, Busse etc.) */
-const OBJEKTE_API = "/api/objekte";
+const OBJEKTE_API = "/api/objekte/oeffentlich";
 
 /**
  * PortalKalender-Seitenkomponente.

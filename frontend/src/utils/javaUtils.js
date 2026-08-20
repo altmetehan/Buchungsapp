@@ -316,11 +316,10 @@ export const getResourceClass = (name) => {
 
 /** Feste Farben für die "originalen" 5 Objekte. */
 const FESTE_RESOURCE_FARBEN = {
-  "wohnung 1": { bg: "#e30000", border: "#b80000" },
-  "wohnung 2": { bg: "#3b82f6", border: "#1d4ed8" },
-  "wohnung 3": { bg: "#10b981", border: "#047857" },
+  "wohnung brandnertal": { bg: "#e30000", border: "#b80000" },
+  "wohnung walsertal": { bg: "#3b82f6", border: "#1d4ed8" },
+  "wohnung klostertal": { bg: "#10b981", border: "#047857" },
   "vito bus": { bg: "#f59e0b", border: "#b45309" },
-  "forum beckhoff": { bg: "#ad9366", border: "#918167" },
 };
 
 /** Farbpalette, aus der sich NEUE Objekte (die nicht in FESTE_RESOURCE_FARBEN stehen) automatisch eine Farbe ziehen. */

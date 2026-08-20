@@ -12,7 +12,6 @@ import {
   isPastDate,
   istStundenbasiert,
   istWohnung,
-  istBus,
   datumZeitUeberschneidenSich,
   getNowIsoWithTime,
   entsprichtWochentag,
@@ -37,6 +36,12 @@ import { useToast } from "./useToast";
  * Pendant für die öffentliche Portal-Seite: usePortalAnfrage.js (sehr
  * ähnlicher Aufbau, aber ohne internen Rabatt/Endpreis-Feinschliff und
  * mit Anfragen- statt Buchungs-Semantik).
+ *
+ * Hinweis: Ein Zusatz-Bus kann hier NICHT mehr mitgebucht werden - das
+ * konnte der Gast/die interne Buchung ohnehin nicht selbst steuern.
+ * Ein Bus lässt sich weiterhin nachträglich über die Buchungskarte
+ * (BuchungskarteModal.jsx) manuell zu einer bestehenden Buchung
+ * dazufügen.
  */
 
 const OBJEKTE_API = "/api/objekte";
@@ -87,7 +92,6 @@ const berechneStunden = (startDatum, startZeit, endDatum, endZeit) => {
  *   - selectedObjekt, handleSelectObjekt, selectedObjektVerfuegbar: gewähltes Objekt
  *   - guestData, handleGuestChange, gastVorschlaege, handleSelectGuestSuggestion: Gästedaten inkl. Autofill
  *   - zeiten, stundenHauptobjekt: Uhrzeiten & Dauer bei stundenbasierten Objekten
- *   - zusatzobjektVerfuegbar, zugewiesenesZusatzobjekt: optionaler Zusatz-Bus
  *   - gesamtpreisBerechnet, rabattProzent, endpreisManuell, effektiverEndpreis: Preislogik
  *   - istBuchungUngueltig, handleFinalizeBooking: Validierung & Speichern
  *   - toast, dismissToast, angenommeneBuchungErfolg, resetAssistent: Erfolgs-/Fehler-Feedback
@@ -97,7 +101,6 @@ export function useBuchungsAssistent() {
   const location = useLocation();
   const { einstellungen } = useEinstellungen();
   const MINDEST_NAECHTE_WOHNUNG = einstellungen.mindest_naechte_wohnung;
-  const ZUSATZOBJEKT_KOMBI_RABATT_PROZENT = einstellungen.kombirabatt;
   const CHECKIN_WOCHENTAG = einstellungen.checkin_wochentag;
   const CHECKOUT_WOCHENTAG = einstellungen.checkout_wochentag;
 
@@ -201,7 +204,6 @@ export function useBuchungsAssistent() {
   const [zeiten, setZeiten] = useState({ anreiseZeit: STANDARD_ANREISE_ZEIT, abreiseZeit: STANDARD_ABREISE_ZEIT });
 
   const [bookingDetails, setBookingDetails] = useState({
-    zusatzobjektMieten: "Nein",
     kennzeichen: "",
     info: "",
   });
@@ -215,9 +217,9 @@ export function useBuchungsAssistent() {
    * Lädt Objekte, Buchungen und Gäste parallel vom Backend und baut
    * daraus die flache "bestehendeBuchungen"-Belegungsliste
    * (ein Eintrag pro belegtem Objekt, also ggf. 2 pro Buchung bei
-   * Kombibuchung mit Zusatzobjekt). Wird initial UND nach jeder
-   * erfolgreichen Buchung erneut aufgerufen, um die Verfügbarkeit
-   * aktuell zu halten.
+   * einer über die Buchungskarte nachträglich hinzugefügten
+   * Kombibuchung). Wird initial UND nach jeder erfolgreichen Buchung
+   * erneut aufgerufen, um die Verfügbarkeit aktuell zu halten.
    *
    * @returns {Promise<void>}
    */
@@ -411,27 +413,7 @@ export function useBuchungsAssistent() {
     return berechneStunden(dateRange.start, zeiten.anreiseZeit, dateRange.end, zeiten.abreiseZeit);
   }, [istHauptobjektStundenbasiert, dateRange.start, dateRange.end, zeiten]);
 
-  /** Alle Busse, die im gewählten Zeitraum (zu den zentralen Check-in/-out-Zeiten) noch frei sind, günstigster zuerst. */
-  const freieZusatzobjekte = useMemo(() => {
-    if (!dateRange.start || !dateRange.end) return [];
-    const checkin = einstellungen.checkin_zeit || "15:00";
-    const checkout = einstellungen.checkout_zeit || "11:00";
-    
-    return objektStammdaten
-      .filter((o) => istBus(o.name))
-      .filter((o) => istVerfuegbar(o.name, startISO, endISO, checkin, checkout))
-      .sort((a, b) => a.preisProNacht - b.preisProNacht);
-  }, [objektStammdaten, dateRange.start, dateRange.end, startISO, endISO, istVerfuegbar, einstellungen]);
-
-  const zusatzobjektVerfuegbar = freieZusatzobjekte.length > 0;
-
-  /** Der tatsächlich dem Gast zugewiesene Zusatz-Bus, falls "Ja" gewählt wurde und einer verfügbar ist. */
-  const zugewiesenesZusatzobjekt = useMemo(() => {
-    if (bookingDetails.zusatzobjektMieten !== "Ja" || !zusatzobjektVerfuegbar) return null;
-    return freieZusatzobjekte[0];
-  }, [bookingDetails.zusatzobjektMieten, zusatzobjektVerfuegbar, freieZusatzobjekte]);
-
-  /** Automatisch berechneter Gesamtpreis (Hauptobjekt + optional Zusatzobjekt inkl. Kombirabatt), vor manuellem Rabatt. */
+  /** Automatisch berechneter Gesamtpreis des Hauptobjekts, vor manuellem Rabatt. */
   const gesamtpreisBerechnet = useMemo(() => {
     if (!selectedObjekt || !dateRange.start || !dateRange.end) return 0;
 
@@ -440,34 +422,8 @@ export function useBuchungsAssistent() {
     }
 
     const reineNaechte = Math.round((dateRange.end - dateRange.start) / (1000 * 60 * 60 * 24));
-    const basis = selectedObjekt.preisProNacht * reineNaechte;
-
-    let zusatzAufpreis = 0;
-    if (bookingDetails.zusatzobjektMieten === "Ja" && zugewiesenesZusatzobjekt) {
-      // der tatsächlich gebuchten Dauer ab.
-      const zusatzStunden = berechneStunden(
-        dateRange.start,
-        einstellungen.checkin_zeit,
-        dateRange.end,
-        einstellungen.checkout_zeit
-      );
-      const zusatzPreisRegulaer = zusatzStunden * zugewiesenesZusatzobjekt.preisProNacht;
-      zusatzAufpreis = zusatzPreisRegulaer * (1 - ZUSATZOBJEKT_KOMBI_RABATT_PROZENT / 100);
-    }
-
-    return basis + zusatzAufpreis;
-  }, [
-    selectedObjekt,
-    dateRange.start,
-    dateRange.end,
-    istHauptobjektStundenbasiert,
-    stundenHauptobjekt,
-    bookingDetails.zusatzobjektMieten,
-    zugewiesenesZusatzobjekt,
-    ZUSATZOBJEKT_KOMBI_RABATT_PROZENT,
-    einstellungen.checkin_zeit,
-    einstellungen.checkout_zeit,
-  ]);
+    return selectedObjekt.preisProNacht * reineNaechte;
+  }, [selectedObjekt, dateRange.start, dateRange.end, istHauptobjektStundenbasiert, stundenHauptobjekt]);
 
   /** Rabatt-Prozent-Feld geändert -> Endpreis proportional neu berechnen. */
   const handleRabattChange = (e) => {
@@ -509,8 +465,8 @@ export function useBuchungsAssistent() {
   };
 
   // Hält den Endpreis synchron, sobald sich der automatisch berechnete
-  // Grundpreis ändert (z.B. weil Zeitraum/Objekt/Zusatzobjekt
-  // gewechselt wurde), ohne den aktuell gesetzten Rabatt zu verlieren.
+  // Grundpreis ändert (z.B. weil Zeitraum/Objekt gewechselt wurde), ohne
+  // den aktuell gesetzten Rabatt zu verlieren.
   useEffect(() => {
     const rabatt = parseFloat(rabattProzent?.toString().replace(",", ".")) || 0;
     const berechnet = gesamtpreisBerechnet * (1 - rabatt / 100);
@@ -762,15 +718,9 @@ export function useBuchungsAssistent() {
       const endpreisZahl =
         parseFloat(endpreisManuell.toString().replace(",", ".")) || gesamtpreisBerechnet;
 
-      const zusatzobjektGebucht =
-        !istHauptobjektStundenbasiert &&
-        bookingDetails.zusatzobjektMieten === "Ja" &&
-        zugewiesenesZusatzobjekt;
-
       const buchungPayload = {
         gast_id: gastId,
         objekt_id: selectedObjekt.id,
-        objekt_id_2: zusatzobjektGebucht ? zugewiesenesZusatzobjekt.id : null,
         anreise: formatDe(dateRange.start),
         abreise: formatDe(dateRange.end),
         infos: infosGesamt || null,
@@ -901,7 +851,7 @@ export function useBuchungsAssistent() {
       land: "Österreich",
     });
     setMatchedGuestId(null);
-    setBookingDetails({ zusatzobjektMieten: "Nein", kennzeichen: "", info: "" });
+    setBookingDetails({ kennzeichen: "", info: "" });
     setRabattProzent("0");
     setAngenommeneBuchungErfolg(null);
     navigate("/buchen");
@@ -951,9 +901,6 @@ export function useBuchungsAssistent() {
     zeiten,
     setZeiten,
     stundenHauptobjekt,
-    zusatzobjektVerfuegbar,
-    zugewiesenesZusatzobjekt,
-    ZUSATZOBJEKT_KOMBI_RABATT_PROZENT,
     MINDEST_NAECHTE_WOHNUNG,
     CHECKIN_WOCHENTAG,
     CHECKOUT_WOCHENTAG,

@@ -48,7 +48,7 @@ model Objekte {
   preis                Float
   kennzeichen          String?
   geloescht_am         DateTime?
-  oeffentlich          Int         @default(0) // 0 für FALSE und 1 für TRUE
+  oeffentlich          Int         @default(0)
   AnfrageZusatzobjekte Anfragen[]  @relation("AnfrageZusatzobjekt")
   AnfrageHauptobjekte  Anfragen[]  @relation("AnfrageHauptobjekt")
   ZusatzBuchungen      Buchungen[] @relation("BuchungZusatzobjekt")

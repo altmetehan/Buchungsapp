@@ -104,9 +104,14 @@ router.get("/", async (req, res) => {
  * POST /api/anfragen
  * Legt eine neue Anfrage vom öffentlichen Portal an. Erwartet im Body
  * Gäste- und Kontaktdaten (name, email, telnr, strasse, hnr, plz,
- * stadt, land) sowie Objekt/Zeitraum (objekt_id, objekt_id_2,
- * anreise, abreise, anreise_zeit, abreise_zeit, erwachsene, kinder,
- * infos).
+ * stadt, land) sowie Objekt/Zeitraum (objekt_id, anreise, abreise,
+ * anreise_zeit, abreise_zeit, erwachsene, kinder, infos).
+ *
+ * Ein Zusatzobjekt (z.B. Bus) kann der Gast hier bewusst NICHT mehr
+ * mitanfragen - das ist keine Option, die er selbst steuern darf. Ein
+ * Bus lässt sich weiterhin intern über die Buchungskarte
+ * (BuchungskarteModal.jsx) zu einer bereits angenommenen Buchung
+ * dazufügen.
  *
  * Der Anfragen-Gast wird per E-Mail gegen bestehende AnfrageGaeste
  * gematcht (Update statt Duplikat) - fehlt die E-Mail, wird immer ein
@@ -125,7 +130,6 @@ router.post("/", async (req, res) => {
       stadt,
       land,
       objekt_id,
-      objekt_id_2,
       anreise,
       abreise,
       anreise_zeit,
@@ -177,7 +181,6 @@ router.post("/", async (req, res) => {
       data: {
         anfrage_gast_id: anfrageGast.id,
         objekt_id: Number(objekt_id),
-        objekt_id_2: objekt_id_2 ? Number(objekt_id_2) : null,
         anreise,
         abreise,
         anreise_zeit: anreise_zeit || null,

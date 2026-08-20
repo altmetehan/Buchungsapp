@@ -1,7 +1,6 @@
 import { BuchungsZusammenfassung } from "../../components/booking/BuchungsZusammenfassung";
 import { CountryDropdown } from "../../components/ui/CountryDropdown";
 import { TimeDropdown } from "../../components/ui/TimeDropdown";
-import { useEinstellungen } from "../../hooks/useEinstellungen";
 import { istWohnung } from "../../utils/javaUtils";
 import "../../styles/shared-ui.css";
 import "../../styles/pageStyles/AnfrageErstellen.css";
@@ -11,9 +10,9 @@ import "../../styles/pageStyles/AnfrageErstellen.css";
  * ----------------------
  * Schritt 2 (letzter Schritt) der öffentlichen Anfrage-Seite:
  * Uhrzeiten (bei stundenbasierten Objekten), Kontaktdaten des
- * Anfragenden, optionaler Zusatz-Bus sowie der finale
- * "Anfrage senden"-Button samt Erfolgs-/Fehler-Modal. Reine Anzeige -
- * der komplette Zustand kommt aus dem usePortalAnfrage-Hook ("vm").
+ * Anfragenden sowie der finale "Anfrage senden"-Button samt
+ * Erfolgs-/Fehler-Modal. Reine Anzeige - der komplette Zustand kommt
+ * aus dem usePortalAnfrage-Hook ("vm").
  *
  * Optisch und strukturell eng an BuchenSchritt2.jsx /
  * BuchenSchritt3.jsx (interner Buchungs-Assistent) angelehnt, aber
@@ -28,8 +27,6 @@ import "../../styles/pageStyles/AnfrageErstellen.css";
  * @returns {JSX.Element}
  */
 export function PortalAnfrageSchritt2({ vm }) {
-  const { einstellungen } = useEinstellungen();
-
   return (
     <div className="buchen-container">
       <span className="breadcrumb">
@@ -190,65 +187,6 @@ export function PortalAnfrageSchritt2({ vm }) {
             </div>
 
             <CountryDropdown value={vm.gastData.land} onChange={(land) => vm.setGastData({ ...vm.gastData, land })} />
-            
-            {vm.istHauptobjektWohnung && (
-              <div className="input-group full-width radio-section">
-                <label>Möchten Sie den Bus dazu anfragen?</label>
-                <div className="radio-options">
-                  <label className={!vm.zusatzobjektVerfuegbar ? "radio-label-disabled" : ""}>
-                    <input
-                      type="radio"
-                      name="zusatzobjektMieten"
-                      value="Ja"
-                      checked={vm.bookingDetails.zusatzobjektMieten === "Ja" && vm.zusatzobjektVerfuegbar}
-                      disabled={!vm.zusatzobjektVerfuegbar}
-                      onChange={(e) =>
-                        vm.setBookingDetails({
-                          ...vm.bookingDetails,
-                          zusatzobjektMieten: e.target.value,
-                        })
-                      }
-                    />{" "}
-                    Ja
-                  </label>
-                  <label>
-                    <input
-                      type="radio"
-                      name="zusatzobjektMieten"
-                      value="Nein"
-                      checked={vm.bookingDetails.zusatzobjektMieten === "Nein" || !vm.zusatzobjektVerfuegbar}
-                      onChange={(e) =>
-                        vm.setBookingDetails({
-                          ...vm.bookingDetails,
-                          zusatzobjektMieten: e.target.value,
-                        })
-                      }
-                    />{" "}
-                    Nein
-                  </label>
-                  <p
-                    style={{
-                      fontSize: "12px",
-                      color: vm.zusatzobjektVerfuegbar ? "#22c55e" : "#ef4444",
-                      fontWeight: "600",
-                    }}
-                  >
-                    {vm.zusatzobjektVerfuegbar
-                      ? `✓ Bus ist im gewählten Zeitraum verfügbar ${vm.ZUSATZOBJEKT_KOMBI_RABATT_PROZENT > 0 ? `(inkl. Kombi-Rabatt)` : ``}.`
-                      : "✕ Kein Bus in diesem Zeitraum verfügbar."}
-                  </p>
-                </div>
-                {vm.bookingDetails.zusatzobjektMieten === "Ja" && vm.zusatzobjektVerfuegbar && (
-                  <p className="radio-section-note" style={{ fontSize: "12px", color: "#71717a" }}>
-                    {vm.zugewiesenesZusatzobjekt?.name} steht dem Gast im Zeitraum der Wohnungsbuchung zur
-                    Verfügung (Abholung {einstellungen.checkin_zeit} Uhr am Anreisetag, Rückgabe {einstellungen.checkout_zeit} Uhr am Abreisetag)
-                    {vm.ZUSATZOBJEKT_KOMBI_RABATT_PROZENT > 0
-                      ? ` - inklusive ${vm.ZUSATZOBJEKT_KOMBI_RABATT_PROZENT}% Kombi-Rabatt auf den Zusatz-Anteil.`
-                      : "."}
-                  </p>
-                )}
-              </div>
-            )}
 
             <div className="input-group full-width">
               <label>Nachricht (optional)</label>

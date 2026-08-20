@@ -9,7 +9,6 @@ import {
   ueberschneidenSich,
   istStundenbasiert,
   istWohnung,
-  istBus,
   isSameDay,
   datumZeitUeberschneidenSich,
   entsprichtWochentag,
@@ -36,9 +35,14 @@ import { useToast } from "./useToast";
  * Gäste-Autofill aus der Gästeliste und echter Buchungs- statt
  * Anfragen-Semantik - hier landet am Ende eine unverbindliche Anfrage
  * im Backend statt direkt einer Buchung).
+ *
+ * Hinweis: Ein Zusatz-Bus kann hier NICHT mitangefragt werden - der
+ * Bus lässt sich weiterhin nachträglich intern über die Buchungskarte
+ * (BuchungskarteModal.jsx) zu einer bereits angenommenen Buchung
+ * dazubuchen.
  */
 
-const OBJEKTE_API = "/api/objekte";
+const OBJEKTE_API = "/api/objekte/oeffentlich";
 const OEFFENTLICHE_BUCHUNGEN_API = "/api/buchungen/oeffentlich";
 const ANFRAGEN_API = "/api/anfragen";
 
@@ -90,7 +94,6 @@ const berechneStunden = (startDatum, startZeit, endDatum, endZeit) => {
  *   - selectedObjekt, handleSelectObjekt, selectedObjektVerfuegbar: gewähltes Objekt
  *   - gastData, handleGastChange: Kontaktdaten des Anfragenden (Schritt 2)
  *   - zeiten, stundenHauptobjekt: Uhrzeiten & Dauer bei stundenbasierten Objekten
- *   - zusatzobjektVerfuegbar, zugewiesenesZusatzobjekt: optionaler Zusatz-Bus
  *   - gesamtpreisBerechnet: reine Preisanzeige (kein Rabatt/Endpreis wie im internen Assistenten)
  *   - istAnfrageUngueltig, handleSubmitAnfrage: Validierung & Absenden
  *   - toast, dismissToast, wurdeGesendet, sendError, handleNeueAnfrage: Erfolgs-/Fehler-Feedback
@@ -100,7 +103,6 @@ export function usePortalAnfrage() {
   const { toast, showToast, dismissToast } = useToast();
 
   const MINDEST_NAECHTE_WOHNUNG = einstellungen.mindest_naechte_wohnung;
-  const ZUSATZOBJEKT_KOMBI_RABATT_PROZENT = einstellungen.kombirabatt ?? 0;
   const CHECKIN_WOCHENTAG = einstellungen.checkin_wochentag;
   const CHECKOUT_WOCHENTAG = einstellungen.checkout_wochentag;
 
@@ -122,8 +124,6 @@ export function usePortalAnfrage() {
   const [selectedObjekt, setSelectedObjekt] = useState(null);
   const [zeiten, setZeiten] = useState({ anreiseZeit: STANDARD_ANREISE_ZEIT, abreiseZeit: STANDARD_ABREISE_ZEIT });
 
-  const [bookingDetails, setBookingDetails] = useState({ zusatzobjektMieten: "Nein" });
-
   // ─── FORMULARDATEN (KONTAKTDATEN DES ANFRAGENDEN) ───
   const [gastData, setGastData] = useState(LEERES_GASTFORMULAR);
   const [nachricht, setNachricht] = useState("");
@@ -137,11 +137,9 @@ export function usePortalAnfrage() {
    * gästedatenlose Belegungsliste vom Backend (GET /api/buchungen/oeffentlich
    * - liefert bewusst NUR Objektname + Zeitraum, siehe
    * buchungen.routes.js) und baut daraus eine flache
-   * "belegungen"-Liste (ein Eintrag pro belegtem Objekt, also ggf. 2
-   * pro Buchung bei Kombibuchung mit Zusatzobjekt) - exakt dasselbe
-   * Muster wie ladeStammdaten() im internen Buchungs-Assistenten,
-   * nur eben ohne Gast-/Preisdaten, weil die Portal-Seite dafür kein
-   * Recht hat.
+   * "belegungen"-Liste - exakt dasselbe Muster wie ladeStammdaten() im
+   * internen Buchungs-Assistenten, nur eben ohne Gast-/Preisdaten,
+   * weil die Portal-Seite dafür kein Recht hat.
    */
   useEffect(() => {
     async function ladeStammdaten() {
@@ -281,26 +279,6 @@ export function usePortalAnfrage() {
     [belegungen]
   );
 
-  /** Alle Busse, die im gewählten Zeitraum (zu den zentralen Check-in/-out-Zeiten) noch frei sind, günstigster zuerst. */
-  const freieZusatzobjekte = useMemo(() => {
-    if (!dateRange.start || !dateRange.end) return [];
-    const checkin = einstellungen.checkin_zeit || "15:00";
-    const checkout = einstellungen.checkout_zeit || "11:00";
-
-    return objektStammdaten
-      .filter((o) => istBus(o.name))
-      .filter((o) => istVerfuegbar(o.name, startISO, endISO, checkin, checkout))
-      .sort((a, b) => a.preisProNacht - b.preisProNacht);
-  }, [objektStammdaten, dateRange.start, dateRange.end, startISO, endISO, istVerfuegbar, einstellungen]);
-
-  const zusatzobjektVerfuegbar = freieZusatzobjekte.length > 0;
-
-  /** Der tatsächlich vorgeschlagene Zusatz-Bus, falls "Ja" gewählt wurde und einer verfügbar ist. */
-  const zugewiesenesZusatzobjekt = useMemo(() => {
-    if (bookingDetails.zusatzobjektMieten !== "Ja" || !zusatzobjektVerfuegbar) return null;
-    return freieZusatzobjekte[0];
-  }, [bookingDetails.zusatzobjektMieten, zusatzobjektVerfuegbar, freieZusatzobjekte]);
-
   const istHauptobjektWohnung = istWohnung(selectedObjekt?.name);
   const istHauptobjektStundenbasiert = istStundenbasiert(selectedObjekt?.name);
 
@@ -311,12 +289,12 @@ export function usePortalAnfrage() {
   }, [istHauptobjektStundenbasiert, dateRange.start, dateRange.end, zeiten]);
 
   /**
-   * Reine Preisanzeige (Hauptobjekt + optional Zusatzobjekt inkl.
-   * Kombirabatt) - dient hier nur zur unverbindlichen Orientierung des
-   * Anfragenden, anders als im internen Buchungs-Assistenten gibt es
-   * auf dieser öffentlichen Seite bewusst KEIN manuelles
-   * Rabatt-/Endpreis-Feld (der finale Preis wird erst beim Annehmen
-   * der Anfrage im Backoffice festgelegt).
+   * Reine Preisanzeige des Hauptobjekts - dient hier nur zur
+   * unverbindlichen Orientierung des Anfragenden, anders als im
+   * internen Buchungs-Assistenten gibt es auf dieser öffentlichen
+   * Seite bewusst KEIN manuelles Rabatt-/Endpreis-Feld (der finale
+   * Preis wird erst beim Annehmen der Anfrage im Backoffice
+   * festgelegt).
    */
   const gesamtpreisBerechnet = useMemo(() => {
     if (!selectedObjekt || !dateRange.start || !dateRange.end) return 0;
@@ -327,40 +305,8 @@ export function usePortalAnfrage() {
       return stundenHauptobjekt * einzelpreis;
     }
 
-    const basis = naechteAnz * einzelpreis;
-
-    let zusatzAufpreis = 0;
-    if (bookingDetails.zusatzobjektMieten === "Ja" && zugewiesenesZusatzobjekt) {
-      const checkin = einstellungen.checkin_zeit || "15:00";
-      const checkout = einstellungen.checkout_zeit || "11:00";
-
-      const zusatzStunden = berechneStunden(
-        dateRange.start,
-        checkin,
-        dateRange.end,
-        checkout
-      );
-
-      const busStundensatz = zugewiesenesZusatzobjekt.preisProNacht || zugewiesenesZusatzobjekt.preis || 0;
-      const zusatzPreisRegulaer = zusatzStunden * busStundensatz;
-      const rabattFaktor = 1 - (ZUSATZOBJEKT_KOMBI_RABATT_PROZENT / 100);
-      zusatzAufpreis = zusatzPreisRegulaer * rabattFaktor;
-    }
-
-    return basis + zusatzAufpreis;
-  }, [
-    selectedObjekt,
-    dateRange.start,
-    dateRange.end,
-    istHauptobjektStundenbasiert,
-    stundenHauptobjekt,
-    naechteAnz,
-    bookingDetails.zusatzobjektMieten,
-    zugewiesenesZusatzobjekt,
-    ZUSATZOBJEKT_KOMBI_RABATT_PROZENT,
-    einstellungen.checkin_zeit,
-    einstellungen.checkout_zeit,
-  ]);
+    return naechteAnz * einzelpreis;
+  }, [selectedObjekt, dateRange.start, dateRange.end, istHauptobjektStundenbasiert, stundenHauptobjekt, naechteAnz]);
 
   // ─── WOCHENTAGS-PRÜFUNG ───
   /** Ob das gewählte Anreisedatum dem zentral vorgegebenen Check-in-Wochentag entspricht (immer true ohne Einschränkung). */
@@ -653,11 +599,6 @@ export function usePortalAnfrage() {
     setIsSaving(true);
     setSendError(false);
     try {
-      const zusatzobjektGebucht =
-        !istHauptobjektStundenbasiert &&
-        bookingDetails.zusatzobjektMieten === "Ja" &&
-        zugewiesenesZusatzobjekt;
-
       const payload = {
         name: gastData.name,
         email: gastData.email,
@@ -668,7 +609,6 @@ export function usePortalAnfrage() {
         stadt: gastData.stadt,
         land: gastData.land,
         objekt_id: selectedObjekt.id,
-        objekt_id_2: zusatzobjektGebucht ? zugewiesenesZusatzobjekt.id : null,
         anreise: formatDe(dateRange.start),
         abreise: formatDe(dateRange.end),
         anreise_zeit: istHauptobjektStundenbasiert ? zeiten.anreiseZeit : einstellungen.checkin_zeit,
@@ -702,7 +642,6 @@ export function usePortalAnfrage() {
     setGastData(LEERES_GASTFORMULAR);
     setGuestCounts({ erwachsene: 2, kinder: 0 });
     setZeiten({ anreiseZeit: STANDARD_ANREISE_ZEIT, abreiseZeit: STANDARD_ABREISE_ZEIT });
-    setBookingDetails({ zusatzobjektMieten: "Nein" });
     setNachricht("");
     setWurdeGesendet(false);
     setSendError(false);
@@ -738,10 +677,6 @@ export function usePortalAnfrage() {
     zeiten,
     setZeiten,
     stundenHauptobjekt,
-    bookingDetails,
-    setBookingDetails,
-    zusatzobjektVerfuegbar,
-    zugewiesenesZusatzobjekt,
     gastData,
     setGastData,
     handleGastChange,
@@ -765,6 +700,5 @@ export function usePortalAnfrage() {
     checkoutWochentagPasst,
     startWochentag: getWochentagName(dateRange.start),
     endWochentag: getWochentagName(dateRange.end),
-    ZUSATZOBJEKT_KOMBI_RABATT_PROZENT,
   };
 }

@@ -1,15 +1,15 @@
 /**
  * Objekte.css
  * -----------
- * Styles nur für die Objektverwaltung: Spaltenbreiten der Tabelle und
- * die Preis-Spalte (rechtsbündig, damit Beträge sauber untereinander
- * stehen).
+ * Styles nur für die Objektverwaltung: Spaltenbreiten der Tabelle,
+ * die Öffentlich-Spalte (zentriertes Häkchen) und die Preis-Spalte
+ * (rechtsbündig, damit Beträge sauber untereinander stehen).
  */
 
-/* Spaltenbreiten: ID | Name | Beschreibung | Preis | Aktionen */
+/* Spaltenbreiten: ID | Name | Beschreibung | Kennzeichen | Öffentlich | Preis | Aktionen */
 .grid-objekte {
     display: grid;
-    grid-template-columns: 80px 200px 220px 1fr 180px 120px;
+    grid-template-columns: 70px 170px 1fr 130px 100px 170px 120px;
 }
 
 .object-id {
@@ -26,6 +26,16 @@
     color: #71717a;
     font-weight: 400;
     padding-right: 40px;
+}
+
+.object-oeffentlich-header,
+.object-oeffentlich {
+    text-align: center;
+}
+
+.object-oeffentlich-header {
+    font-weight: 500;
+    color: #8e8e93;
 }
 
 .object-preis-header,

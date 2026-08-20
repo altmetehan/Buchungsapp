@@ -292,15 +292,14 @@ router.post("/:id/preisanpassungen", async (req, res) => {
  * GET /api/buchungen/oeffentlich
  * Für die öffentliche Portal-Seite: liefert NUR Objektname(n) +
  * Zeitraum, absichtlich OHNE Gast-Daten (Name, E-Mail, Adresse, Preis,
- * Notizen). Besucher der öffentlichen Seite dürfen sehen WANN etwas
- * belegt ist, aber nicht VON WEM - deshalb ein eigener, bewusst
- * reduzierter Endpunkt statt den bestehenden GET / einfach im
- * Frontend zu "filtern" (sonst würden die Gästedaten trotzdem über die
- * Leitung gehen).
+ * Notizen). Zusätzlich werden hier auch private (nicht als
+ * "oeffentlich" markierte) Objekte herausgefiltert - eine Buchung mit
+ * einem internen Hauptobjekt darf im Portal-Kalender nicht auftauchen,
+ * selbst wenn z.B. das Zusatzobjekt öffentlich wäre (und umgekehrt).
  */
 router.get("/oeffentlich", async (req, res) => {
   try {
-    const buchungen = await prisma.buchungen.findMany({
+    const buchungenRoh = await prisma.buchungen.findMany({
       where: { geloescht_am: null },
       select: {
         id: true,
@@ -308,10 +307,22 @@ router.get("/oeffentlich", async (req, res) => {
         abreise: true,
         anreise_zeit: true,
         abreise_zeit: true,
-        Objekte: { select: { name: true } },
-        ObjekteZusatz: { select: { name: true } },
+        Objekte: { select: { name: true, oeffentlich: true } },
+        ObjekteZusatz: { select: { name: true, oeffentlich: true } },
       },
     });
+
+    // Private Objekte werden hier zu null, statt an den Client zu gehen -
+    // die Portal-Seiten (PortalKalender/usePortalAnfrage) ignorieren
+    // null-Einträge ohnehin schon (siehe dortiges "if (!objekt) return").
+    const buchungen = buchungenRoh
+      .map((b) => ({
+        ...b,
+        Objekte: b.Objekte?.oeffentlich ? { name: b.Objekte.name } : null,
+        ObjekteZusatz: b.ObjekteZusatz?.oeffentlich ? { name: b.ObjekteZusatz.name } : null,
+      }))
+      .filter((b) => b.Objekte || b.ObjekteZusatz);
+
     res.json(buchungen);
   } catch (err) {
     res.status(500).json({ error: err.message });
