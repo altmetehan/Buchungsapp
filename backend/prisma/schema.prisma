@@ -10,7 +10,6 @@ model Buchungen {
   id               Int                @id @default(autoincrement())
   gast_id          Int
   objekt_id        Int
-  objekt_id_2      Int?
   anreise          String
   abreise          String
   anreise_zeit     String?
@@ -20,8 +19,7 @@ model Buchungen {
   preis            Float
   infos            String?
   geloescht_am     DateTime?
-  ObjekteZusatz    Objekte?           @relation("BuchungZusatzobjekt", fields: [objekt_id_2], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  Objekte          Objekte            @relation("BuchungHauptobjekt", fields: [objekt_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Objekte          Objekte            @relation(fields: [objekt_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   Gaeste           Gaeste             @relation(fields: [gast_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   Preisanpassungen Preisanpassungen[]
   Rechnungen       Rechnungen[]
@@ -51,8 +49,7 @@ model Objekte {
   oeffentlich          Int         @default(0)
   AnfrageZusatzobjekte Anfragen[]  @relation("AnfrageZusatzobjekt")
   AnfrageHauptobjekte  Anfragen[]  @relation("AnfrageHauptobjekt")
-  ZusatzBuchungen      Buchungen[] @relation("BuchungZusatzobjekt")
-  Buchungen            Buchungen[] @relation("BuchungHauptobjekt")
+  Buchungen            Buchungen[]
 }
 
 model Rechnungen {
@@ -68,7 +65,6 @@ model Einstellungen {
   checkin_zeit            String? @default("15:00")
   checkout_zeit           String? @default("11:00")
   mindest_naechte_wohnung Int?    @default(2)
-  kombirabatt             Float?  @default(0)
   checkin_wochentag       String? @default("")
   checkout_wochentag      String? @default("")
   ortstaxe                Float?  @default(2.50)

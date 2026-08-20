@@ -26,9 +26,11 @@ export function useEinstellungen() {
     checkin_zeit: "15:00",
     checkout_zeit: "11:00",
     mindest_naechte_wohnung: 2,
-    kombirabatt: 0,
     checkin_wochentag: "",
     checkout_wochentag: "",
+    ortstaxe: 0,
+    mwst_ortstaxe: 0,
+    mwst_normal: 10,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

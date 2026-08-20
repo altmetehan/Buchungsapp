@@ -113,7 +113,6 @@ export function Einstellungen() {
           checkin_zeit: form.checkin_zeit,
           checkout_zeit: form.checkout_zeit,
           mindest_naechte_wohnung: parseInt(form.mindest_naechte_wohnung, 10) || 1,
-          kombirabatt: parseFloat(form.kombirabatt) || 0,
           checkin_wochentag: form.checkin_wochentag || "",
           checkout_wochentag: form.checkout_wochentag || "",
           ortstaxe: parseFloat(form.ortstaxe) || 0,
@@ -195,22 +194,6 @@ export function Einstellungen() {
                 />
                 <span style={{ fontSize: "12px", color: "#71717a", marginTop: "4px" }}>
                   Wird bei Wochentagsänderung automatisch als Vorschlag angepasst.
-                </span>
-              </div>
-
-              <div className="input-group full-width">
-                <label>Kombi-Rabatt bei Zusatzbuchung von einem Bus (%) *</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  required
-                  value={form.kombirabatt ?? 0}
-                  onChange={(e) => setForm({ ...form, kombirabatt: e.target.value })}
-                />
-                <span style={{ fontSize: "12px", color: "#71717a", marginTop: "4px" }}>
-                  Rabatt auf den Bus-Aufpreis bei Kombibuchung.
                 </span>
               </div>
             </div>

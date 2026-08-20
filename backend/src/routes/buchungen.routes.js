@@ -17,35 +17,19 @@ import { BuchungsbestaetigungDocument } from "../pdf/BuchungsBestaetigungDocumen
 const router = Router();
 
 /**
- * Gemeinsamer "include"-Block für praktisch jede Buchungs-Abfrage:
- * eine Buchung kann ein Hauptobjekt (Wohnung ODER Bus) und optional
- * ein Zusatzobjekt haben (z.B. ein Bus, der zusammen mit einer
- * Wohnung gemietet wurde). Dieses "include" holt Gast, Hauptobjekt,
- * Zusatzobjekt UND die komplette Preisanpassungs-Historie in einem
- * Rutsch, damit jede Seite, die Buchungen lädt
- * (Dashboard/Kalender/Reservierungen/Rechnungen), automatisch auch
- * die Anpassungs-Historie mitbekommt, ohne selbst nachfragen zu
- * müssen.
+ * Gemeinsamer "include"-Block für praktisch jede Buchungs-Abfrage.
  */
 const MIT_GAST_UND_OBJEKTEN = {
   include: {
     Gaeste: true,
     Objekte: true,
-    ObjekteZusatz: true,
     Preisanpassungen: { orderBy: { erstellt_am: "desc" } },
   },
 };
 
 /**
  * Erlaubte, vom Client änderbare Felder einer bestehenden Buchung
- * (PUT /:id). Baut aus dem rohen req.body ein "sauberes" Datenobjekt,
- * in dem nur vorhandene Felder übernommen werden (undefined-Werte
- * lässt Prisma bei update() unverändert).
- *
- * Vorher wurde hier "data: req.body" 1:1 an Prisma durchgereicht -
- * dadurch hätte ein Request theoretisch auch interne/fremde Felder
- * (z.B. "id" oder "gast_id") mit-überschreiben können. Die explizite
- * Liste hier verhindert das (Mass-Assignment-Schutz).
+ * (PUT /:id).
  *
  * @param {object} body - req.body
  * @returns {object}
@@ -56,7 +40,6 @@ function baueBuchungUpdateDaten(body) {
     "abreise",
     "anreise_zeit",
     "abreise_zeit",
-    "objekt_id_2",
     "preis",
     "infos",
     "erwachsene",
@@ -91,15 +74,14 @@ router.get("/", async (req, res) => {
 /**
  * POST /api/buchungen
  * Legt eine neue Buchung an. Erwartet mindestens: gast_id, objekt_id,
- * anreise, abreise (+ optional objekt_id_2, anreise_zeit,
- * abreise_zeit, erwachsene, kinder, preis, infos).
+ * anreise, abreise (+ optional anreise_zeit, abreise_zeit, erwachsene,
+ * kinder, preis, infos).
  */
 router.post("/", async (req, res) => {
   try {
     const {
       gast_id,
       objekt_id,
-      objekt_id_2,
       anreise,
       abreise,
       anreise_zeit,
@@ -114,7 +96,6 @@ router.post("/", async (req, res) => {
       data: {
         gast_id: Number(gast_id),
         objekt_id: Number(objekt_id),
-        objekt_id_2: objekt_id_2 ? Number(objekt_id_2) : null,
         anreise,
         abreise,
         anreise_zeit: anreise_zeit || null,
@@ -139,13 +120,8 @@ router.post("/", async (req, res) => {
  * Aktualisiert eine bestehende Buchung.
  *
  * Wird bei dieser Bearbeitung auch die Abreise geändert, muss das
- * Rechnungsdatum der verknüpften Rechnung automatisch mitwandern - eine
- * Rechnung wird immer auf den letzten Tag der Buchung (= die neue
- * Abreise) datiert. Ohne das würde eine nachträglich verschobene
- * Buchung ein falsches Rechnungsdatum behalten. Beides läuft in EINER
- * Transaktion: entweder klappen Buchungs- UND Rechnungsupdate zusammen,
- * oder keins von beiden - sonst könnten Buchung und Rechnung
- * auseinanderlaufen, falls mittendrin z.B. die Verbindung abbricht.
+ * Rechnungsdatum der verknüpften Rechnung automatisch mitwandern.
+ * Beides läuft in EINER Transaktion.
  */
 router.put("/:id", async (req, res) => {
   try {
@@ -158,11 +134,6 @@ router.put("/:id", async (req, res) => {
         data: updateDaten,
         ...MIT_GAST_UND_OBJEKTEN,
       }),
-      // updateMany statt update, weil buchung_id zwar unique ist, aber
-      // updateMany (anders als update) NICHT mit einem Fehler abbricht,
-      // falls zu dieser Buchung ausnahmsweise noch gar keine Rechnung
-      // existiert - dann wird einfach 0 Zeilen aktualisiert, statt die
-      // ganze Buchungsbearbeitung mit einem 400er scheitern zu lassen.
       ...(updateDaten.abreise
         ? [
             prisma.rechnungen.updateMany({
@@ -184,25 +155,21 @@ router.put("/:id", async (req, res) => {
 /**
  * DELETE /api/buchungen/:id
  * Storniert eine Buchung per Soft-Delete (geloescht_am wird gesetzt)
- * und löscht die zugehörige(n) Rechnung(en) endgültig, da eine
- * stornierte Buchung nicht mehr in Rechnung gestellt sein soll.
+ * und löscht die zugehörige(n) Rechnung(en) endgültig.
  */
 router.delete("/:id", async (req, res) => {
   try {
     const buchungId = Number(req.params.id);
     await prisma.$transaction([
-      // 1. Buchung als storniert markieren
       prisma.buchungen.update({
         where: { id: buchungId },
         data: { geloescht_am: new Date() },
       }),
-      // 2. Zugehörige Rechnung(en) endgültig löschen
       prisma.rechnungen.deleteMany({
         where: { buchung_id: buchungId },
       }),
     ]);
 
-    // Live-Update für Buchungen UND Rechnungen an alle Clients senden
     broadcast("buchungen:changed");
     broadcast("rechnungen:changed");
     res.status(204).send();
@@ -213,10 +180,7 @@ router.delete("/:id", async (req, res) => {
 
 /**
  * GET /api/buchungen/:id/preisanpassungen
- * Liefert die reine Preisänderungs-Historie für EINE Buchung. Aktuell
- * ungenutzt vom Frontend (die Historie kommt schon über das normale
- * GET /api/buchungen mit), steht aber bereit, falls sie später isoliert
- * nachgeladen werden soll, ohne die komplette Buchung erneut zu holen.
+ * Liefert die reine Preisänderungs-Historie für EINE Buchung.
  */
 router.get("/:id/preisanpassungen", async (req, res) => {
   try {
@@ -234,15 +198,7 @@ router.get("/:id/preisanpassungen", async (req, res) => {
 /**
  * POST /api/buchungen/:id/preisanpassungen
  * Legt eine neue Preisanpassung an UND setzt direkt den neuen Preis
- * auf der Buchung selbst. Erwartet im Body: neuer_betrag (Zahl), grund
- * (Pflichttext).
- *
- * Beide Schreibvorgänge (Historie-Eintrag anlegen + Buchung
- * aktualisieren) laufen in einer Transaktion - entweder klappen beide,
- * oder keiner. Ohne das könnte z.B. bei einem Verbindungsabbruch
- * mittendrin ein Historie-Eintrag entstehen, ohne dass der Preis
- * tatsächlich geändert wurde (oder umgekehrt) - dann wären Anzeige und
- * echter Preis dauerhaft inkonsistent.
+ * auf der Buchung selbst.
  */
 router.post("/:id/preisanpassungen", async (req, res) => {
   try {
@@ -290,12 +246,9 @@ router.post("/:id/preisanpassungen", async (req, res) => {
 
 /**
  * GET /api/buchungen/oeffentlich
- * Für die öffentliche Portal-Seite: liefert NUR Objektname(n) +
- * Zeitraum, absichtlich OHNE Gast-Daten (Name, E-Mail, Adresse, Preis,
- * Notizen). Zusätzlich werden hier auch private (nicht als
- * "oeffentlich" markierte) Objekte herausgefiltert - eine Buchung mit
- * einem internen Hauptobjekt darf im Portal-Kalender nicht auftauchen,
- * selbst wenn z.B. das Zusatzobjekt öffentlich wäre (und umgekehrt).
+ * Für die öffentliche Portal-Seite: liefert NUR Objektname + Zeitraum,
+ * absichtlich OHNE Gast-Daten. Private (nicht "oeffentlich" markierte)
+ * Objekte werden herausgefiltert.
  */
 router.get("/oeffentlich", async (req, res) => {
   try {
@@ -308,20 +261,15 @@ router.get("/oeffentlich", async (req, res) => {
         anreise_zeit: true,
         abreise_zeit: true,
         Objekte: { select: { name: true, oeffentlich: true } },
-        ObjekteZusatz: { select: { name: true, oeffentlich: true } },
       },
     });
 
-    // Private Objekte werden hier zu null, statt an den Client zu gehen -
-    // die Portal-Seiten (PortalKalender/usePortalAnfrage) ignorieren
-    // null-Einträge ohnehin schon (siehe dortiges "if (!objekt) return").
     const buchungen = buchungenRoh
       .map((b) => ({
         ...b,
         Objekte: b.Objekte?.oeffentlich ? { name: b.Objekte.name } : null,
-        ObjekteZusatz: b.ObjekteZusatz?.oeffentlich ? { name: b.ObjekteZusatz.name } : null,
       }))
-      .filter((b) => b.Objekte || b.ObjekteZusatz);
+      .filter((b) => b.Objekte);
 
     res.json(buchungen);
   } catch (err) {
@@ -332,9 +280,7 @@ router.get("/oeffentlich", async (req, res) => {
 /**
  * GET /api/buchungen/:id/pdf
  * Generiert die Buchungsbestätigung als PDF und liefert sie direkt in
- * der Antwort ("inline", öffnet also im Browser statt einen Download
- * zu erzwingen). Wird bewusst frisch bei jedem Aufruf gerendert statt
- * gecacht - Buchungsdaten können sich jederzeit ändern.
+ * der Antwort ("inline").
  */
 router.get("/:id/pdf", async (req, res) => {
   try {
@@ -344,7 +290,6 @@ router.get("/:id/pdf", async (req, res) => {
         include: {
           Gaeste: true,
           Objekte: true,
-          ObjekteZusatz: true,
         },
       }),
       prisma.einstellungen.findFirst(),
