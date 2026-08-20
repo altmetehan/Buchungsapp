@@ -87,7 +87,7 @@ export function Rechnungen() {
           : naechte * (buchung?.Objekte?.preis || 0);
 
       const objektAnzeige = buchung?.Objekte?.name
-        ? `${buchung.Objekte.name}${buchung?.ObjekteZusatz ? " + " + buchung.ObjekteZusatz.name : ""}`
+        ? `${buchung.Objekte.name}`
         : "Unbekanntes Objekt";
 
       return {
@@ -385,7 +385,7 @@ export function Rechnungen() {
       <Toast toast={toast} onClose={dismissToast} />
       <div className="page-header">
         <div className="header-text">
-          <h2>Rechnungen</h2>
+          <h2>Rechnungen (Informationen für die Buchhaltung)</h2>
           <p className="subtitle">
             Übersicht über alle Rechnungen. Rechnungen werden bei einer Buchung automatisch erstellt – 
             über den Button „+ Rechnung erstellen“ kann eine Rechnung bei Bedarf manuell für eine bestehende Buchung nacherzeugt

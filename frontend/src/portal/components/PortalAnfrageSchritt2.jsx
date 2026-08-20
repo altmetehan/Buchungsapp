@@ -185,8 +185,11 @@ export function PortalAnfrageSchritt2({ vm }) {
                 <input type="text" name="stadt" placeholder="Stadt" required value={vm.gastData.stadt} onChange={vm.handleGastChange} />
               </div>
             </div>
+
+            <CountryDropdown value={vm.gastData.land} onChange={(land) => vm.setGastData({ ...vm.gastData, land })} />
+
             <div className="input-group full-width">
-              <label>PKW - Kennzeichen (optional)</label>
+              <label>PKW - Kennzeichen (falls Sie mit dem Auto anreisen)</label>
               <input
                 type="text"
                 name="pkw"
@@ -195,8 +198,6 @@ export function PortalAnfrageSchritt2({ vm }) {
                 onChange={vm.handleGastChange}
               />
             </div>
-
-            <CountryDropdown value={vm.gastData.land} onChange={(land) => vm.setGastData({ ...vm.gastData, land })} />
 
             <div className="input-group full-width">
               <label>Nachricht (optional)</label>

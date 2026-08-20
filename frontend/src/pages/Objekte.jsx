@@ -238,7 +238,7 @@ export function Objekte() {
                   {object.oeffentlich ? (
                     <span style={{ color: "#2b9348", fontWeight: 700 }}>✓</span>
                   ) : (
-                    <span style={{ color: "#a1a1aa" }}>—</span>
+                    <span style={{ color: "#e30000", fontWeight: 500, fontSize: "15px" }}>X</span>
                   )}
                 </span>
                 <span className="object-preis" style={object.preis === 0 ? { fontWeight: 400, color: "#8e8e93", fontSize: "12px" } : {}}>

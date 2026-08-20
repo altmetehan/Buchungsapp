@@ -130,7 +130,7 @@ export function BuchenSchritt3({ vm }) {
               />
             </div>
             {/* SPALTEN-SPLIT: ENDPREIS (3/4) UND PKW-KENNZEICHEN (1/4) */}
-            <div className="input-group full-width form-row-split">
+            <div className={vm.istHauptobjektStundenbasiert ? "input-group full-width" : "input-group full-width form-row-split"}>
               <div className="input-group">
                 <label>Endpreis (€) *</label>
                 <input
@@ -148,16 +148,22 @@ export function BuchenSchritt3({ vm }) {
                 )}
               </div>
 
-              <div className="input-group">
-                <label>PKW - Kennzeichen</label>
-                <input
-                  type="text"
-                  placeholder="z.B. DO-123AB"
-                  value={vm.bookingDetails.pkw}
-                  onChange={(e) => vm.setBookingDetails({ ...vm.bookingDetails, pkw: e.target.value })}
-                />
-              </div>
+              {!vm.istHauptobjektStundenbasiert ? (
+                <div className="input-group">
+                  <label>PKW - Kennzeichen</label>
+                  <input
+                    type="text"
+                    placeholder="z.B. DO-123AB"
+                    value={vm.bookingDetails.pkw}
+                    onChange={(e) => vm.setBookingDetails({ ...vm.bookingDetails, pkw: e.target.value })}
+                  />
+                </div>
+              ) : (
+                <div></div>
+              )}
+
             </div>
+            
             <div className="input-group full-width">
               <label>Buchungsinformationen</label>
               <textarea

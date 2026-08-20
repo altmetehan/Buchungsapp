@@ -708,7 +708,7 @@ export function useBuchungsAssistent() {
         abreise: formatDe(dateRange.end),
         infos: bookingDetails.info || null,
         preis: endpreisZahl,
-        pkw: bookingDetails.pkw || "keine angegeben",
+        pkw: bookingDetails.pkw || istHauptobjektStundenbasiert ? null : "keine angegeben",
         erwachsene: istWohnung(selectedObjekt?.name) ? guestCounts.erwachsene : null,
         kinder: istWohnung(selectedObjekt?.name) ? guestCounts.kinder : null,
       };
