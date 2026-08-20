@@ -4,37 +4,37 @@ import { getLogoBase64 } from '../utils/pdfUtils.js';
 
 /**
  * @file BuchungsBestaetigungDocument.js
- * @description PDF-Vorlage für verbindliche Buchungsbestätigungen im CI-konformen Unternehmensdesign (Beckhoff Automation)[cite: 4].
+ * @description PDF-Vorlage für verbindliche Buchungsbestätigungen im CI-konformen Unternehmensdesign (Beckhoff Automation).
  *              Generiert über `@react-pdf/renderer` eine druckreife A4-Bestätigung mit
  *              Leistungstabelle, automatischer steuerlicher Aufschlüsselung (Netto-Leistung,
  *              Mehrwertsteuer, Ortstaxe für Erwachsene ab 14 Jahren), Hinweisen nach Objekttyp
- *              (Wohnung vs. Fahrzeug) sowie dreispaltiger Fußzeile[cite: 4, 26].
+ *              (Wohnung vs. Fahrzeug) sowie dreispaltiger Fußzeile.
  * @module pdf/BuchungsBestaetigungDocument
  */
 
 /**
- * Alias für React.createElement zur deklarativen Baumkonstruktion im Backend[cite: 4].
+ * Alias für React.createElement zur deklarativen Baumkonstruktion im Backend.
  * @type {Function}
  */
 const h = React.createElement;
 
 /**
- * Farbpalette für das PDF-Dokumentenlayout (Beckhoff-Design)[cite: 4].
+ * Farbpalette für das PDF-Dokumentenlayout (Beckhoff-Design).
  * @constant
  * @type {Object.<string, string>}
  */
 const COLORS = {
-  primary: '#E30000',       // Beckhoff Rot (Akzentfarbe)[cite: 4]
-  textPrimary: '#18181B',   // Tiefes Anthrazit für Überschriften und Haupttext[cite: 4]
-  textSecondary: '#52525B', // Neutrales Dunkelgrau für Beschreibungen und Fließtext[cite: 4]
-  textMuted: '#8E8E93',     // Dezent für Metadaten und Hilfslinien[cite: 4]
-  borderLight: '#E4E4E7',   // Helle Trennlinien[cite: 4]
-  borderDark: '#27272A',    // Dunkle Akzenttrennlinien[cite: 4]
-  white: '#FFFFFF',         // Hintergrundfarbe[cite: 4]
+  primary: '#E30000',       // Beckhoff Rot (Akzentfarbe)
+  textPrimary: '#18181B',   // Tiefes Anthrazit für Überschriften und Haupttext
+  textSecondary: '#52525B', // Neutrales Dunkelgrau für Beschreibungen und Fließtext
+  textMuted: '#8E8E93',     // Dezent für Metadaten und Hilfslinien
+  borderLight: '#E4E4E7',   // Helle Trennlinien
+  borderDark: '#27272A',    // Dunkle Akzenttrennlinien
+  white: '#FFFFFF',         // Hintergrundfarbe
 };
 
 /**
- * StyleSheet-Definitionen für das typografische Raster und Flexbox-Layout der PDF-Seite[cite: 4].
+ * StyleSheet-Definitionen für das typografische Raster und Flexbox-Layout der PDF-Seite.
  */
 const styles = StyleSheet.create({
   page: {
@@ -312,11 +312,11 @@ const styles = StyleSheet.create({
 });
 
 /**
- * Formatiert einen numerischen Betrag als österreichische/deutsche Währungsangabe (z. B. "1.234,50 €")[cite: 4].
+ * Formatiert einen numerischen Betrag als österreichische/deutsche Währungsangabe (z. B. "1.234,50 €").
  *
  * @function
- * @param {number|string} val - Der zu formatierende Geldbetrag[cite: 4].
- * @returns {string} Formatierter Währungsstring inklusive Euro-Zeichen[cite: 4].
+ * @param {number|string} val - Der zu formatierende Geldbetrag.
+ * @returns {string} Formatierter Währungsstring inklusive Euro-Zeichen.
  */
 const formatCurrency = (val) => {
   const num = typeof val === 'number' ? val : parseFloat(val) || 0;
@@ -324,11 +324,11 @@ const formatCurrency = (val) => {
 };
 
 /**
- * Wandelt ein Datum sicher in "DD.MM.YYYY" um[cite: 4].
+ * Wandelt ein Datum sicher in "DD.MM.YYYY" um.
  *
  * @function
- * @param {Date|string|null|undefined} dateVal - Der eingehende Datumswert[cite: 4].
- * @returns {string} Das formatierte Datum oder "-" bei ungültigem / fehlendem Wert[cite: 4].
+ * @param {Date|string|null|undefined} dateVal - Der eingehende Datumswert.
+ * @returns {string} Das formatierte Datum oder "-" bei ungültigem / fehlendem Wert.
  */
 const formatDate = (dateVal) => {
   if (!dateVal) return '-';
@@ -351,77 +351,77 @@ const formatDate = (dateVal) => {
 
 /**
  * @typedef {Object} Gast
- * @property {string} [name] - Name des Gastes[cite: 4].
- * @property {string} [vorname] - Vorname[cite: 4].
- * @property {string} [nachname] - Nachname[cite: 4].
- * @property {string} [strasse] - Straße[cite: 4].
- * @property {string} [hnr] - Hausnummer[cite: 4].
- * @property {string} [plz] - PLZ[cite: 4].
- * @property {string} [stadt] - Stadt[cite: 4].
- * @property {string} [land] - Land[cite: 4].
+ * @property {string} [name] - Name des Gastes.
+ * @property {string} [vorname] - Vorname.
+ * @property {string} [nachname] - Nachname.
+ * @property {string} [strasse] - Straße.
+ * @property {string} [hnr] - Hausnummer.
+ * @property {string} [plz] - PLZ.
+ * @property {string} [stadt] - Stadt.
+ * @property {string} [land] - Land.
  */
 
 /**
  * @typedef {Object} Objekt
- * @property {number|string} [id] - Objekt-ID[cite: 4].
- * @property {string} [name] - Objektname[cite: 4].
- * @property {number} [preis] - Einzelpreis[cite: 4].
+ * @property {number|string} [id] - Objekt-ID.
+ * @property {string} [name] - Objektname.
+ * @property {number} [preis] - Einzelpreis.
  */
 
 /**
  * @typedef {Object} Buchung
- * @property {number|string} [id] - Buchungs-ID[cite: 4].
- * @property {string} [anreise] - Anreisedatum[cite: 4].
- * @property {string} [abreise] - Abreisedatum[cite: 4].
- * @property {string} [anreise_zeit] - Anreise-Uhrzeit[cite: 4].
- * @property {string} [abreise_zeit] - Abreise-Uhrzeit[cite: 4].
- * @property {number} [erwachsene] - Anzahl Erwachsene[cite: 4].
- * @property {number} [kinder] - Anzahl Kinder[cite: 4].
- * @property {number} [preis] - Buchungspreis (Aufenthalt)[cite: 4].
- * @property {string|Date} [erstellt_am] - Erstellungsdatum[cite: 4].
- * @property {Gast} [Gaeste] - Gastdaten[cite: 4].
- * @property {Objekt} [Objekte] - Hauptobjekt[cite: 4].
- * @property {Objekt} [ObjekteZusatz] - Zusatzobjekt[cite: 4].
+ * @property {number|string} [id] - Buchungs-ID.
+ * @property {string} [anreise] - Anreisedatum.
+ * @property {string} [abreise] - Abreisedatum.
+ * @property {string} [anreise_zeit] - Anreise-Uhrzeit.
+ * @property {string} [abreise_zeit] - Abreise-Uhrzeit.
+ * @property {number} [erwachsene] - Anzahl Erwachsene.
+ * @property {number} [kinder] - Anzahl Kinder.
+ * @property {number} [preis] - Buchungspreis (Aufenthalt).
+ * @property {string|Date} [erstellt_am] - Erstellungsdatum.
+ * @property {Gast} [Gaeste] - Gastdaten.
+ * @property {Objekt} [Objekte] - Hauptobjekt.
+ * @property {Objekt} [ObjekteZusatz] - Zusatzobjekt.
  */
 
 /**
  * @typedef {Object} UnternehmensDaten
- * @property {string} name - Firmenname[cite: 4].
- * @property {string} strasse - Firmenadresse[cite: 4].
- * @property {string} plzOrt - PLZ und Ort[cite: 4].
- * @property {string} land - Land[cite: 4].
- * @property {string} email - Kontakt-E-Mail[cite: 4].
- * @property {string} telefon - Telefonnummer[cite: 4].
- * @property {string} web - Website-URL[cite: 4].
- * @property {string} firmenbuch - Firmenbuchnummer[cite: 4].
- * @property {string} uid - UID-Nummer[cite: 4].
- * @property {string} [wlanSsid] - WLAN Name[cite: 4].
- * @property {string} [wlanPw] - WLAN Passwort[cite: 4].
+ * @property {string} name - Firmenname.
+ * @property {string} strasse - Firmenadresse.
+ * @property {string} plzOrt - PLZ und Ort.
+ * @property {string} land - Land.
+ * @property {string} email - Kontakt-E-Mail.
+ * @property {string} telefon - Telefonnummer.
+ * @property {string} web - Website-URL.
+ * @property {string} firmenbuch - Firmenbuchnummer.
+ * @property {string} uid - UID-Nummer.
+ * @property {string} [wlanSsid] - WLAN Name.
+ * @property {string} [wlanPw] - WLAN Passwort.
  */
 
 /**
  * @typedef {Object} Einstellungen
- * @property {number} [ortstaxe] - Ortstaxe pro Person und Nacht in Euro (z. B. 2.0)[cite: 26].
- * @property {number} [mwst_ortstaxe] - Steuersatz auf die Ortstaxe in Prozent (z. B. 0)[cite: 26].
- * @property {number} [mwst_normal] - Regulärer Mehrwertsteuersatz in Prozent (z. B. 10)[cite: 26].
+ * @property {number} [ortstaxe] - Ortstaxe pro Person und Nacht in Euro (z. B. 2.0).
+ * @property {number} [mwst_ortstaxe] - Steuersatz auf die Ortstaxe in Prozent (z. B. 0).
+ * @property {number} [mwst_normal] - Regulärer Mehrwertsteuersatz in Prozent (z. B. 10).
  */
 
 /**
  * @typedef {Object} BuchungsbestaetigungDocumentProps
- * @property {Buchung} [buchung] - Buchungsdatensatz inklusive Relationen[cite: 4].
- * @property {Gast|null} [gast] - Gaststammdaten[cite: 4].
- * @property {Objekt|null} [objekt] - Objektstammdaten[cite: 4].
- * @property {string|null} [logoSrc] - Logo Data-URI[cite: 4].
- * @property {UnternehmensDaten} [unternehmensDaten] - Absender- und Standortinformationen[cite: 4].
- * @property {Einstellungen} [einstellungen] - Konfigurierte Steuersätze und Ortstaxenwerte[cite: 26].
+ * @property {Buchung} [buchung] - Buchungsdatensatz inklusive Relationen.
+ * @property {Gast|null} [gast] - Gaststammdaten.
+ * @property {Objekt|null} [objekt] - Objektstammdaten.
+ * @property {string|null} [logoSrc] - Logo Data-URI.
+ * @property {UnternehmensDaten} [unternehmensDaten] - Absender- und Standortinformationen.
+ * @property {Einstellungen} [einstellungen] - Konfigurierte Steuersätze und Ortstaxenwerte.
  */
 
 /**
- * BuchungsbestaetigungDocument-Komponente[cite: 4].
+ * BuchungsbestaetigungDocument-Komponente.
  *
  * @component
- * @param {BuchungsbestaetigungDocumentProps} props - Komponenten-Properties[cite: 4].
- * @returns {JSX.Element} Das gerenderte React-PDF Document-Element[cite: 4].
+ * @param {BuchungsbestaetigungDocumentProps} props - Komponenten-Properties.
+ * @returns {JSX.Element} Das gerenderte React-PDF Document-Element.
  */
 export function BuchungsbestaetigungDocument({
   buchung = {},
@@ -478,7 +478,7 @@ export function BuchungsbestaetigungDocument({
       { size: 'A4', style: styles.page },
 
       // ===================================================================
-      // 1. KOPFBEREICH: Firmenlogo & Absender-Kurzangaben[cite: 4]
+      // 1. KOPFBEREICH: Firmenlogo & Absender-Kurzangaben
       // ===================================================================
       h(
         View,
@@ -495,7 +495,7 @@ export function BuchungsbestaetigungDocument({
       ),
 
       // ===================================================================
-      // 2. BRIEFFENSTER & METADATEN-CONTAINER[cite: 4]
+      // 2. BRIEFFENSTER & METADATEN-CONTAINER
       // ===================================================================
       h(
         View,
@@ -503,7 +503,6 @@ export function BuchungsbestaetigungDocument({
         h(
           View,
           { style: styles.addressCol },
-          h(Text, { style: styles.senderSmall }, `${unternehmensDaten.name} • ${unternehmensDaten.plzOrt}`),
           h(Text, { style: styles.recipientName }, gastName),
           h(Text, { style: styles.recipientLine }, gastAdresse),
           h(Text, { style: styles.recipientLine }, gastOrt),
@@ -540,7 +539,7 @@ export function BuchungsbestaetigungDocument({
       ),
 
       // ===================================================================
-      // 3. ANREDE & DOKUMENTENTITEL[cite: 4]
+      // 3. ANREDE & DOKUMENTENTITEL
       // ===================================================================
       h(Text, { style: styles.docTitle }, `Buchungsbestätigung #${buchungId}`),
       h(
@@ -551,7 +550,7 @@ export function BuchungsbestaetigungDocument({
       ),
 
       // ===================================================================
-      // 4. LEISTUNGSTABELLE[cite: 4]
+      // 4. LEISTUNGSTABELLE
       // ===================================================================
       h(
         View,
@@ -601,7 +600,7 @@ export function BuchungsbestaetigungDocument({
       ),
 
       // ===================================================================
-      // 5. SUMMENBLOCK & STEUERAUFSCHLÜSSELUNG (ORTSTAXE & MWST)[cite: 26]
+      // 5. SUMMENBLOCK & STEUERAUFSCHLÜSSELUNG (ORTSTAXE & MWST)
       // ===================================================================
       (() => {
         const oSatz = typeof einstellungen?.ortstaxe === 'number' ? einstellungen.ortstaxe : parseFloat(einstellungen?.ortstaxe) || 0;
@@ -679,7 +678,7 @@ export function BuchungsbestaetigungDocument({
       })(),
 
       // ===================================================================
-      // 6. HINWEISE & ANWEISUNGEN (DYNAMISCH NACH OBJEKTTYP)[cite: 4]
+      // 6. HINWEISE & ANWEISUNGEN (DYNAMISCH NACH OBJEKTTYP)
       // ===================================================================
       h(
         View,
@@ -690,7 +689,7 @@ export function BuchungsbestaetigungDocument({
           isWohnung ? 'Informationen für Ihren Aufenthalt' : 'Informationen zur Fahrzeugnutzung'
         ),
 
-        // Punkt 1: Schlüsselübergabe / Fahrzeugübernahme[cite: 4]
+        // Punkt 1: Schlüsselübergabe / Fahrzeugübernahme
         h(
           View,
           { style: styles.bulletRow },
@@ -713,7 +712,7 @@ export function BuchungsbestaetigungDocument({
           )
         ),
 
-        // Punkt 2: Internet / Tankregelung[cite: 4]
+        // Punkt 2: Internet / Tankregelung
         h(
           View,
           { style: styles.bulletRow },
@@ -736,7 +735,7 @@ export function BuchungsbestaetigungDocument({
           )
         ),
 
-        // Punkt 3: Hausordnung / Rückgabebedingungen[cite: 4]
+        // Punkt 3: Hausordnung / Rückgabebedingungen
         h(
           View,
           { style: styles.bulletRow },
@@ -761,7 +760,7 @@ export function BuchungsbestaetigungDocument({
       ),
 
       // ===================================================================
-      // 7. FUSSZEILE (DREISPALTIG AUSGERICHTET)[cite: 4]
+      // 7. FUSSZEILE (DREISPALTIG AUSGERICHTET)
       // ===================================================================
       h(
         View,

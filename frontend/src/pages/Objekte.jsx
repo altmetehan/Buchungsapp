@@ -292,6 +292,7 @@ export function Objekte() {
                     type="text"
                     inputMode="decimal"
                     name="preis"
+                    min="0"
                     value={newObject.preis}
                     onChange={handleInputChange}
                     placeholder={istWohnung(newObject.name) ? "z.B. 120" : "z.B. 15,50"}

@@ -93,7 +93,7 @@
 
 /* --- DRINGENDE ANKÜNFTE --- */
 .list-row.arrival-row--dringend {
-  background-color: #e3000020;
+  background-color: #ffd9009f;
   border-left: 4px solid #ef4444;
 }
 

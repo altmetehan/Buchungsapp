@@ -16,7 +16,6 @@ import { Rechnungen } from "./pages/Rechnungen";
 import { Objekte } from "./pages/Objekte";
 import { Einstellungen } from "./pages/Einstellungen";
 import { Anfragen } from "./pages/Anfragen";
-import Login from "./pages/Login";
 
 const ANFRAGEN_API = "/api/anfragen";
 
