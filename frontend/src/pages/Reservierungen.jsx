@@ -132,16 +132,14 @@ export function Reservierungen() {
             checkOut: b.abreise,
             infos: b.infos,
             objekt_id: b.objekt_id,
-            objekt_id_2: b.objekt_id_2 || null,
             hauptobjektName: b.Objekte?.name || null,
-            zusatzobjektName: b.ObjekteZusatz?.name || null,
-            ObjekteZusatz: b.ObjekteZusatz || null,
             rawBooking: b,
             anreiseZeit: b.anreise_zeit,
             abreiseZeit: b.abreise_zeit,
             preisanpassungen: b.Preisanpassungen || [],
             erwachsene: b.erwachsene ?? null,
             kinder: b.kinder ?? null,
+            pkw: b.pkw,
           };
 
           const heute = new Date();
@@ -188,15 +186,16 @@ export function Reservierungen() {
     const idDarfMitsuchen = searchWords.length === 1;
 
     return reservationsWithSortDate.filter((res) => {
+      const pkwClean = res.pkw ? res.pkw.replace(/[-\s]/g, "").toLowerCase() : "";
+
       const textFelder = [
         res.name,
         res.resource,
-        res.zusatzobjektName,
         res.email,
-        res.phone,
         res.infos,
         res.checkIn,
         res.checkOut,
+        pkwClean,
       ];
       if (idDarfMitsuchen) textFelder.push(res.id?.toString());
 
@@ -304,7 +303,7 @@ export function Reservierungen() {
                           )}
                         </span>
                         <span className="row-title">
-                          {res.resource} {res.zusatzobjektName !== null ? "+ " + res.zusatzobjektName : ""}
+                          {res.resource}
                         </span>
                         <span>
                           {res.checkIn}

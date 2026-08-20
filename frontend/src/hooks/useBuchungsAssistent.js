@@ -36,12 +36,6 @@ import { useToast } from "./useToast";
  * Pendant für die öffentliche Portal-Seite: usePortalAnfrage.js (sehr
  * ähnlicher Aufbau, aber ohne internen Rabatt/Endpreis-Feinschliff und
  * mit Anfragen- statt Buchungs-Semantik).
- *
- * Hinweis: Ein Zusatz-Bus kann hier NICHT mehr mitgebucht werden - das
- * konnte der Gast/die interne Buchung ohnehin nicht selbst steuern.
- * Ein Bus lässt sich weiterhin nachträglich über die Buchungskarte
- * (BuchungskarteModal.jsx) manuell zu einer bestehenden Buchung
- * dazufügen.
  */
 
 const OBJEKTE_API = "/api/objekte";
@@ -204,7 +198,7 @@ export function useBuchungsAssistent() {
   const [zeiten, setZeiten] = useState({ anreiseZeit: STANDARD_ANREISE_ZEIT, abreiseZeit: STANDARD_ABREISE_ZEIT });
 
   const [bookingDetails, setBookingDetails] = useState({
-    kennzeichen: "",
+    pkw: "",
     info: "",
   });
 
@@ -215,11 +209,10 @@ export function useBuchungsAssistent() {
 
   /**
    * Lädt Objekte, Buchungen und Gäste parallel vom Backend und baut
-   * daraus die flache "bestehendeBuchungen"-Belegungsliste
-   * (ein Eintrag pro belegtem Objekt, also ggf. 2 pro Buchung bei
-   * einer über die Buchungskarte nachträglich hinzugefügten
-   * Kombibuchung). Wird initial UND nach jeder erfolgreichen Buchung
-   * erneut aufgerufen, um die Verfügbarkeit aktuell zu halten.
+   * daraus die flache "bestehendeBuchungen"-Belegungsliste (ein
+   * Eintrag pro belegtem Objekt). Wird initial UND nach jeder
+   * erfolgreichen Buchung erneut aufgerufen, um die Verfügbarkeit
+   * aktuell zu halten.
    *
    * @returns {Promise<void>}
    */
@@ -252,9 +245,6 @@ export function useBuchungsAssistent() {
         const abreiseZeit = b.abreise_zeit;
         if (b.Objekte) {
           belegungen.push({ resource: b.Objekte.name, start, end, anreiseZeit, abreiseZeit });
-        }
-        if (b.ObjekteZusatz) {
-          belegungen.push({ resource: b.ObjekteZusatz.name, start, end, anreiseZeit, abreiseZeit });
         }
       });
       setBestehendeBuchungen(belegungen);
@@ -708,13 +698,6 @@ export function useBuchungsAssistent() {
         gastId = neuerGast.id;
       }
 
-      const infosGesamt = [
-        bookingDetails.kennzeichen ? `PKW-Kennzeichen: ${bookingDetails.kennzeichen}` : null,
-        bookingDetails.info || null,
-      ]
-        .filter(Boolean)
-        .join(" · ");
-
       const endpreisZahl =
         parseFloat(endpreisManuell.toString().replace(",", ".")) || gesamtpreisBerechnet;
 
@@ -723,8 +706,9 @@ export function useBuchungsAssistent() {
         objekt_id: selectedObjekt.id,
         anreise: formatDe(dateRange.start),
         abreise: formatDe(dateRange.end),
-        infos: infosGesamt || null,
+        infos: bookingDetails.info || null,
         preis: endpreisZahl,
+        pkw: bookingDetails.pkw || "keine angegeben",
         erwachsene: istWohnung(selectedObjekt?.name) ? guestCounts.erwachsene : null,
         kinder: istWohnung(selectedObjekt?.name) ? guestCounts.kinder : null,
       };
@@ -851,7 +835,7 @@ export function useBuchungsAssistent() {
       land: "Österreich",
     });
     setMatchedGuestId(null);
-    setBookingDetails({ kennzeichen: "", info: "" });
+    setBookingDetails({ pkw: "", info: "" });
     setRabattProzent("0");
     setAngenommeneBuchungErfolg(null);
     navigate("/buchen");

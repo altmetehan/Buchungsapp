@@ -8,7 +8,6 @@ import beckhoffLogo from "./assets/logoschwarz.png";
 
 import { PortalKalender } from "./portal/pages/PortalKalender";
 import { PortalAnfrage } from "./portal/pages/PortalAnfrage";
-import Login from "./pages/Login";
 
 /** Bewusst nur zwei Punkte - mehr soll ein Besucher hier nicht sehen. */
 const PORTAL_NAV_ITEMS = [
@@ -72,24 +71,6 @@ export function PortalApp() {
             ))}
           </div>
         </nav>
-
-        {/* LOGIN-FELD MIT NAVLINK */}
-        <div className="sidebar-footer">
-          <NavLink
-            to="/portal/login"
-            className="nav-button"
-            style={{
-              fontWeight: "600",
-              color: "#dc2626",
-            }}
-            onClick={() => {
-              if (window.innerWidth <= 1200) setIsCollapsed(true);
-            }}
-          >
-            <span className="bullet-dot">🔒</span>
-            Login
-          </NavLink>
-        </div>
       </aside>
 
       <main className="main-content">
@@ -97,7 +78,6 @@ export function PortalApp() {
           <Route index element={<Navigate to="kalender" replace />} />
           <Route path="kalender" element={<PortalKalender />} />
           <Route path="anfrage" element={<PortalAnfrage />} />
-          <Route path="login" element={<Login />} />
           <Route path="*" element={<Navigate to="kalender" replace />} />
         </Routes>
       </main>

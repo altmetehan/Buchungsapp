@@ -28,15 +28,14 @@ const formatEuro = (betrag) =>
   new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(betrag);
 
 /**
- * Konstruiert eine normalisierte Datenzeile für Kalender-Events (unterstützt Haupt- und Zusatzobjekte).
+ * Konstruiert eine normalisierte Datenzeile für Kalender-Events.
  *
  * @function
  * @param {Object} buchung - Buchungsdatensatz.
  * @param {Object} objekt - Zugehöriges Objekt.
- * @param {boolean} istZusatz - Ob es sich um das Zusatzobjekt handelt.
  * @returns {Object|null}
  */
-function buildeKalenderZeile(buchung, objekt, istZusatz) {
+function buildeKalenderZeile(buchung, objekt) {
   if (!objekt) return null;
 
   const gast = buchung.Gaeste;
@@ -67,8 +66,7 @@ function buildeKalenderZeile(buchung, objekt, istZusatz) {
 
   return {
     id: buchung.id,
-    eventId: istZusatz ? `${buchung.id}-zusatz` : `${buchung.id}`,
-    istZusatzEintrag: istZusatz,
+    eventId: `${buchung.id}`,
     name: gast?.name,
     email: gast?.email,
     phone: gast?.telnr,
@@ -88,14 +86,12 @@ function buildeKalenderZeile(buchung, objekt, istZusatz) {
     status,
     preis,
     objekt_id: buchung.objekt_id,
-    objekt_id_2: buchung.objekt_id_2 || null,
     hauptobjektName: buchung.Objekte?.name || null,
-    zusatzobjektName: buchung.ObjekteZusatz?.name || null,
-    ObjekteZusatz: buchung.ObjekteZusatz || null,
     rawBooking: buchung,
     preisanpassungen: buchung.Preisanpassungen || [],
     erwachsene: buchung.erwachsene,
     kinder: buchung.kinder,
+    pkw: buchung.pkw,
   };
 }
 
@@ -132,11 +128,8 @@ export function Kalender() {
 
         const rows = [];
         buchungen.forEach((b) => {
-          const hauptEintrag = buildeKalenderZeile(b, b.Objekte, false);
-          if (hauptEintrag) rows.push(hauptEintrag);
-
-          const zusatzEintrag = buildeKalenderZeile(b, b.ObjekteZusatz, true);
-          if (zusatzEintrag) rows.push(zusatzEintrag);
+          const eintrag = buildeKalenderZeile(b, b.Objekte);
+          if (eintrag) rows.push(eintrag);
         });
 
         setReservations(rows);

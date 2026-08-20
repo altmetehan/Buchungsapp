@@ -128,16 +128,13 @@ export function Dashboard() {
           checkOut: b.abreise,
           infos: b.infos,
           objekt_id: b.objekt_id,
-          objekt_id_2: b.objekt_id_2 || null,
-          hauptobjektName: b.Objekte?.name || null,
-          zusatzobjektName: b.ObjekteZusatz?.name || null,
-          ObjekteZusatz: b.ObjekteZusatz || null,
           anreiseZeit: b.anreise_zeit,
           abreiseZeit: b.abreise_zeit,
           rawBooking: b,
           preisanpassungen: b.Preisanpassungen || [],
           erwachsene: b.erwachsene ?? null,
           kinder: b.kinder ?? null,
+          pkw: b.pkw,
         };
 
         obj.start = germanToISO(obj.checkIn);
@@ -207,16 +204,14 @@ export function Dashboard() {
    *
    * @function
    * @param {string} resourceName - Name des zu prüfenden Objekts.
-   * @returns {{status: string, guest: string, zusatz: string|null, kombiMit: string|null, subDate: string}} Statusobjekt.
+   * @returns {{status: string, guest: string, subDate: string}} Statusobjekt.
    */
   const getLiveStatus = (resourceName) => {
     const nameLower = resourceName.toLowerCase();
     const nowStr = getNowIsoWithTime();
 
     const activeBooking = reservations.find((b) => {
-      const matchesResource =
-        b.resource?.toLowerCase() === nameLower ||
-        b.zusatzobjektName?.toLowerCase() === nameLower;
+      const matchesResource = b.resource?.toLowerCase() === nameLower;
 
       if (!matchesResource) return false;
 
@@ -230,23 +225,9 @@ export function Dashboard() {
     });
 
     if (activeBooking) {
-      const isHauptobjekt = activeBooking.resource?.toLowerCase() === nameLower;
-      const isZusatzobjekt = activeBooking.zusatzobjektName?.toLowerCase() === nameLower;
-
-      let zusatz = null;
-      let kombiMit = null;
-
-      if (isHauptobjekt && activeBooking.zusatzobjektName) {
-        zusatz = activeBooking.zusatzobjektName;
-      } else if (isZusatzobjekt && activeBooking.resource) {
-        kombiMit = activeBooking.resource;
-      }
-
       return {
         status: "belegt",
         guest: activeBooking.guestName,
-        zusatz,
-        kombiMit,
         subDate: `bis ${formatDe(parseISO(activeBooking.end))}${
           activeBooking.abreiseZeit ? ` (${activeBooking.abreiseZeit} Uhr)` : ""
         }`,
@@ -255,9 +236,7 @@ export function Dashboard() {
 
     const futureBookings = reservations
       .filter((b) => {
-        const matchesResource =
-          b.resource?.toLowerCase() === nameLower ||
-          b.zusatzobjektName?.toLowerCase() === nameLower;
+        const matchesResource = b.resource?.toLowerCase() === nameLower;
         if (!matchesResource) return false;
 
         const startZeit = b.anreiseZeit || "00:00";
@@ -276,12 +255,11 @@ export function Dashboard() {
       return {
         status: "frei",
         guest: "-",
-        zusatz: null,
         subDate: `bis ${formatDe(parseISO(nextB.start))}${zeitsuffix}`,
       };
     }
 
-    return { status: "frei", guest: "-", zusatz: null, subDate: "durchgehend frei" };
+    return { status: "frei", guest: "-", subDate: "durchgehend frei" };
   };
 
   /**
@@ -306,7 +284,7 @@ export function Dashboard() {
       .map((b) => ({
         id: b.id,
         guestName: b.guestName,
-        resource: `${b.resource}${b.zusatzobjektName ? " + " + b.zusatzobjektName : ""} - #${b.id}`,
+        resource: `${b.resource} - #${b.id}`,
         start: b.start,
         arrivalDate: formatDe(parseISO(b.start)).slice(0, 5) + ".",
         arrivalTime: b.anreiseZeit,
@@ -322,8 +300,7 @@ export function Dashboard() {
 
     return reservations
       .filter((b) => {
-        const isAndere = !istWohnung(b.resource) || b.zusatzobjektName;
-        if (!isAndere) return false;
+        if (istWohnung(b.resource)) return false;
 
         const startZeit = b.anreiseZeit || "00:00";
         const startFull = `${b.start}T${startZeit}`;
@@ -336,14 +313,10 @@ export function Dashboard() {
       })
       .slice(0, 5)
       .map((b) => {
-        const resText = b.zusatzobjektName
-          ? `${b.resource} + ${b.zusatzobjektName}`
-          : b.resource;
-
         return {
           id: b.id,
           guestName: b.guestName,
-          resource: `${resText} - #${b.id}`,
+          resource: `${b.resource} - #${b.id}`,
           start: b.start,
           arrivalDate: `${formatDe(parseISO(b.start)).slice(0, 5)}.`,
           arrivalTime: b.anreiseZeit,
@@ -382,7 +355,7 @@ export function Dashboard() {
 
     const nameLower = selectedObjForCalendar.name.toLowerCase();
     const objectBookings = reservations.filter(
-      (b) => b.resource?.toLowerCase() === nameLower || b.zusatzobjektName?.toLowerCase() === nameLower,
+      (b) => b.resource?.toLowerCase() === nameLower,
     );
 
     return objectBookings.map((b) => {
@@ -418,8 +391,7 @@ export function Dashboard() {
     const nowStr = getNowIsoWithTime();
 
     const activeBooking = reservations.find((b) => {
-      const matchesResource =
-        b.resource?.toLowerCase() === nameLower || b.zusatzobjektName?.toLowerCase() === nameLower;
+      const matchesResource = b.resource?.toLowerCase() === nameLower;
       if (!matchesResource) return false;
 
       const startFull = `${b.start}T${b.anreiseZeit || "00:00"}`;

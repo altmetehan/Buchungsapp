@@ -24,7 +24,7 @@
 
 /* Spaltenbreiten: Rechnungsnummer | Datum | Objekt | Gast | Betrag */
 .grid-rechnungen {
-    grid-template-columns: 130px 140px 160px 220px 120px 1fr;
+    grid-template-columns: 130px 140px 200px 220px 120px 1fr;
 }
 
 .res-datum,

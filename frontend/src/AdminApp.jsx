@@ -205,40 +205,6 @@ export function AdminApp() {
             <span className="bullet-dot">⚙</span>
             Einstellungen
           </NavLink>
-
-          {/* Eingeloggter Benutzer mit Aufklappfeld nach oben */}
-          <div className="sidebar-user-wrapper" ref={userMenuRef}>
-            {isUserMenuOpen && (
-              <div className="sidebar-user-popover">
-                <div className="sidebar-user-popover-info">
-                  <div className="popover-name">Administrator</div>
-                  <div className="popover-email">admin@system.local</div>
-                </div>
-                <div className="popover-divider" />
-                <button
-                  type="button"
-                  className="popover-logout-btn"
-                  onClick={handleLogout}
-                >
-                  <span>Abmelden</span>
-                </button>
-              </div>
-            )}
-
-            <button
-              type="button"
-              className={`sidebar-user-button ${isUserMenuOpen ? "active" : ""}`}
-              onClick={() => setIsUserMenuOpen((prev) => !prev)}
-              title="Benutzerprofil anzeigen"
-            >
-              <div className="sidebar-user-avatar">M</div>
-              {!isCollapsed && (
-                <div className="sidebar-user-meta">
-                  <span className="sidebar-user-name">Metehan</span>
-                </div>
-              )}
-            </button>
-          </div>
         </div>
       </aside>
 

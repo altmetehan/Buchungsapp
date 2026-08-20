@@ -85,7 +85,6 @@
   background-color: #e3000020;
   border-left: 4px solid #ef4444;
 }
-
 .list-row.status-row--frei {
   background-color: #22c55e15;
   border-left: 4px solid #22c55e;
@@ -93,8 +92,8 @@
 
 /* --- DRINGENDE ANKÜNFTE --- */
 .list-row.arrival-row--dringend {
-  background-color: #ffd9009f;
-  border-left: 4px solid #ef4444;
+  background-color: #ffe60030;
+  border-left: 4px solid #d6c564;
 }
 
 .arrival-row--dringend .row-resource,

@@ -542,7 +542,7 @@ export function Rechnungen() {
                     className="btn-outline"
                     onClick={() => handleOpenEditModal(rechnung)}
                   >
-                    Bearbeiten
+                    Preisanpassung
                   </button>
                   <button
                     className="btn-pdf-action"

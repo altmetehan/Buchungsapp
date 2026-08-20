@@ -103,6 +103,7 @@ router.post("/", async (req, res) => {
       erwachsene,
       kinder,
       infos,
+      pkw, // <-- NEU: PKW aus Body entgegennehmen
     } = req.body;
 
     const emailClean = email && email.trim() !== "" ? email.trim().toLowerCase() : null;
@@ -153,6 +154,7 @@ router.post("/", async (req, res) => {
         erwachsene: erwachsene ? Number(erwachsene) : null,
         kinder: kinder ? Number(kinder) : null,
         infos: infos || null,
+        pkw: pkw || null, // <-- NEU: PKW in der Anfrage speichern
         status: "offen",
       },
       ...MIT_OBJEKTEN_UND_ANFRAGE_GAST,
@@ -176,7 +178,7 @@ router.post("/", async (req, res) => {
 router.put("/:id/annehmen", async (req, res) => {
   try {
     const anfrageId = Number(req.params.id);
-    const { preis } = req.body;
+    const { preis, pkw } = req.body; // <-- NEU: pkw aus req.body erlauben
 
     const anfrage = await prisma.anfragen.findUnique({
       where: { id: anfrageId },
@@ -238,6 +240,9 @@ router.put("/:id/annehmen", async (req, res) => {
       ? `Nachricht vom Gast: ${anfrage.infos.trim()}`
       : null;
 
+    // Entweder der beim Annehmen manuell eingegebene PKW oder der aus der Anfrage
+    const finalerPkw = pkw !== undefined ? (pkw || null) : (anfrage.pkw || null);
+
     const { neueBuchung, aktualisierteAnfrage, neueRechnung } = await prisma.$transaction(async (tx) => {
       const aGast = anfrage.AnfrageGaeste;
       let gast = null;
@@ -290,6 +295,7 @@ router.put("/:id/annehmen", async (req, res) => {
           erwachsene: anfrage.erwachsene,
           kinder: anfrage.kinder,
           infos: buchungInfos,
+          pkw: finalerPkw, // <-- NEU: PKW wird in Buchungen angelegt
         },
         include: { Gaeste: true, Objekte: true },
       });
@@ -304,7 +310,11 @@ router.put("/:id/annehmen", async (req, res) => {
 
       const anfrageUpdated = await tx.anfragen.update({
         where: { id: anfrageId },
-        data: { status: "angenommen", angenommen_am: new Date() },
+        data: {
+          status: "angenommen",
+          angenommen_am: new Date(),
+          ...(pkw !== undefined ? { pkw: finalerPkw } : {}), // Synchronisiert das Feld bei der Anfrage
+        },
         ...MIT_OBJEKTEN_UND_ANFRAGE_GAST,
       });
 

@@ -64,39 +64,37 @@ export function PortalKalender() {
 
         const rows = [];
         buchungen.forEach((b) => {
-          // Für jedes belegte Objekt (Haupt- und optionales Zusatzobjekt) ein Event erstellen
-          [b.Objekte, b.ObjekteZusatz].forEach((objekt, idx) => {
-            if (!objekt) return;
+          const objekt = b.Objekte;
+          if (!objekt) return;
 
-            const startParts = b.anreise.split(".");
-            const isoStart = `${startParts[2]}-${startParts[1]}-${startParts[0]}`;
-            const endParts = b.abreise.split(".");
-            const isoEnd = `${endParts[2]}-${endParts[1]}-${endParts[0]}`;
+          const startParts = b.anreise.split(".");
+          const isoStart = `${startParts[2]}-${startParts[1]}-${startParts[0]}`;
+          const endParts = b.abreise.split(".");
+          const isoEnd = `${endParts[2]}-${endParts[1]}-${endParts[0]}`;
 
-            const realEndDate = new Date(isoEnd);
-            realEndDate.setDate(realEndDate.getDate() + 1);
-            const formattedEndDate = realEndDate.toISOString().split("T")[0];
+          const realEndDate = new Date(isoEnd);
+          realEndDate.setDate(realEndDate.getDate() + 1);
+          const formattedEndDate = realEndDate.toISOString().split("T")[0];
 
-            const stundenbasiertUndEinTag = (objektname) =>
-              istStundenbasiert(objektname) && b.anreise === b.abreise;
+          const stundenbasiertUndEinTag =
+            istStundenbasiert(objekt.name) && b.anreise === b.abreise;
 
-            const farbe = getResourceColor(objekt.name);
+          const farbe = getResourceColor(objekt.name);
 
-            rows.push({
-              id: `${b.id}-${idx}`,
-              resource: objekt.name,
-              title: stundenbasiertUndEinTag(objekt.name)
-                ? `${objekt.name} -  ${b.anreise_zeit} bis ${b.abreise_zeit}`
-                : istStundenbasiert(objekt.name)
-                  ? `${objekt.name} · ab ${b.anreise_zeit} / bis ${b.abreise_zeit}`
-                  : `${objekt.name} · Belegt`,
-              start: isoStart,
-              end: formattedEndDate,
-              allDay: true,
-              backgroundColor: farbe.bg,
-              borderColor: farbe.border,
-              textColor: "#ffffff",
-            });
+          rows.push({
+            id: `${b.id}`,
+            resource: objekt.name,
+            title: stundenbasiertUndEinTag
+              ? `${objekt.name} -  ${b.anreise_zeit} bis ${b.abreise_zeit}`
+              : istStundenbasiert(objekt.name)
+                ? `${objekt.name} · ab ${b.anreise_zeit} / bis ${b.abreise_zeit}`
+                : `${objekt.name} · Belegt`,
+            start: isoStart,
+            end: formattedEndDate,
+            allDay: true,
+            backgroundColor: farbe.bg,
+            borderColor: farbe.border,
+            textColor: "#ffffff",
           });
         });
 

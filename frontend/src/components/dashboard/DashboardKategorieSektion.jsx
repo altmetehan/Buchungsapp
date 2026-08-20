@@ -44,7 +44,7 @@ function berechneTageBis(datumVal) {
  * Props:
  * - kategorieName:        Anzeigename, z.B. "Wohnungen" oder "Andere Objekte"
  * - objekte:               Stammdaten-Liste dieser Kategorie
- * - getLiveStatus:         (name: string) => { status, guest, zusatz, subDate }
+ * - getLiveStatus:         (name: string) => { status, guest, subDate }
  * - ankuenfte:             vorbereitete Liste der nächsten Ankünfte (inkl. gaesteInfo)
  * - onDetailsClick:        (objekt) => void - öffnet den Mini-Kalender (Status-Liste oben)
  * - onArrivalDetailsClick: (bookingId) => void - öffnet die Buchungskarte (Ankünfte-Liste unten)
@@ -82,12 +82,6 @@ export function DashboardKategorieSektion({
             <div key={obj.id} className={`list-row grid-status ${statusClass}`}>
             <span className="row-title">
               {obj.name}
-              {live.zusatz && <span className="row-zusatz-badge">+ {live.zusatz}</span>}
-              {live.kombiMit && (
-                <span className="row-zusatz-badge" >
-                  (mit {live.kombiMit})
-                </span>
-              )}
             </span>
               <span className={`tag ${live.status}`}>
                 {live.status} <span className="sub-date">{live.subDate}</span>

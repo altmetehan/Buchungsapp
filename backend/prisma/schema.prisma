@@ -18,6 +18,7 @@ model Buchungen {
   kinder           Int?
   preis            Float
   infos            String?
+  pkw          String?
   geloescht_am     DateTime?
   Objekte          Objekte            @relation(fields: [objekt_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   Gaeste           Gaeste             @relation(fields: [gast_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -106,6 +107,7 @@ model Anfragen {
   erwachsene      Int?
   kinder          Int?
   infos           String?
+  pkw             String?
   status          String?       @default("offen")
   ablehnungsgrund String?
   erstellt_am     DateTime?     @default(now())

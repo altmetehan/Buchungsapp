@@ -90,6 +90,7 @@ router.post("/", async (req, res) => {
       kinder,
       preis,
       infos,
+      pkw,
     } = req.body;
 
     const neueBuchung = await prisma.buchungen.create({
@@ -104,6 +105,7 @@ router.post("/", async (req, res) => {
         kinder: kinder ? Number(kinder) : null,
         preis: Number(preis),
         infos: infos || null,
+        pkw: pkw || null,
       },
       ...MIT_GAST_UND_OBJEKTEN,
     });

@@ -54,7 +54,7 @@ const berechneStunden = (startDatum, startZeit, endDatum, endZeit) => {
 };
 
 /**
- * Berechnet den exakten Vorschlagspreis inkl. Zusatzobjekt & Kombirabatt für eine Anfrage.
+ * Berechnet den exakten Vorschlagspreis für eine Anfrage.
  *
  * @function
  * @param {Object} anfrage - Anfragedaten.
@@ -80,18 +80,7 @@ const berechneVorschlagsPreis = (anfrage, einstellungen) => {
     mainPreis = stunden * (anfrage.Objekte?.preis || 0);
   }
 
-  let zusatzPreis = 0;
-  if (anfrage.ObjekteZusatz) {
-    const checkin = anfrage.anreise_zeit || einstellungen?.checkin_zeit || "15:00";
-    const checkout = anfrage.abreise_zeit || einstellungen?.checkout_zeit || "11:00";
-    const zusatzStunden = berechneStunden(startD, checkin, endD, checkout);
-    const busStundensatz = anfrage.ObjekteZusatz.preis || 0;
-    const zusatzRegulaer = zusatzStunden * busStundensatz;
-    const kombirabatt = einstellungen?.kombirabatt ?? 0;
-    zusatzPreis = zusatzRegulaer * (1 - kombirabatt / 100);
-  }
-
-  return Math.round((mainPreis + zusatzPreis) * 100) / 100;
+  return Math.round(mainPreis * 100) / 100;
 };
 
 /**
@@ -120,6 +109,7 @@ export function Anfragen() {
   const [annehmenBasisPreis, setAnnehmenBasisPreis] = useState(0);
   const [annehmenRabattProzent, setAnnehmenRabattProzent] = useState("0");
   const [annehmenPreis, setAnnehmenPreis] = useState("0");
+  const [annehmenPkw, setAnnehmenPkw] = useState("");
 
   const [angenommeneBuchungErfolg, setAngenommeneBuchungErfolg] = useState(null);
 
@@ -198,7 +188,6 @@ export function Anfragen() {
       a.name,
       a.email,
       a.Objekte?.name,
-      a.ObjekteZusatz?.name,
       a.infos,
       a.ablehnungsgrund,
       a.anreise,
@@ -269,6 +258,7 @@ export function Anfragen() {
     setAnnehmenBasisPreis(exakterVorschlag);
     setAnnehmenRabattProzent("0");
     setAnnehmenPreis(exakterVorschlag.toFixed(2));
+    setAnnehmenPkw(anfrage.pkw || "keine angegeben");
   };
 
   const handleOpenAblehnenModal = (anfrage) => {
@@ -330,6 +320,7 @@ export function Anfragen() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           preis: parseFloat(annehmenPreis.toString().replace(",", ".")) || 0,
+          pkw: annehmenPkw || null,
         }),
       });
       if (!response.ok) {
@@ -450,7 +441,6 @@ export function Anfragen() {
                   </span>
                   <span>
                     {a.Objekte?.name}
-                    {a.ObjekteZusatz ? ` + ${a.ObjekteZusatz.name}` : ""}
                   </span>
                   <span>
                     {a.anreise} – {a.abreise}
@@ -540,7 +530,6 @@ export function Anfragen() {
                   </span>
                   <span>
                     {a.Objekte?.name}
-                    {a.ObjekteZusatz ? ` + ${a.ObjekteZusatz.name}` : ""}
                   </span>
                   <span>
                     {a.anreise} - {a.abreise}
@@ -619,6 +608,11 @@ export function Anfragen() {
                 </p>
                 <p className="detail-secondary-text">✉ {selectedAnfrageDetails.email}</p>
                 <p className="detail-secondary-text">📞 {selectedAnfrageDetails.telnr || "Keine Telefonnummer"}</p>
+                {selectedAnfrageDetails.pkw && (
+                  <p className="detail-secondary-text" style={{ marginTop: "4px", color: "#111827", fontWeight: "600" }}>
+                    🚗 PKW: {selectedAnfrageDetails.pkw}
+                  </p>
+                )}
                 <p className="detail-address-divider">
                   📍 {selectedAnfrageDetails.strasse} {selectedAnfrageDetails.hnr}, {selectedAnfrageDetails.plz}{" "}
                   {selectedAnfrageDetails.stadt}, {selectedAnfrageDetails.land?.toUpperCase()}
@@ -628,11 +622,6 @@ export function Anfragen() {
               <div className="detail-card-block">
                 <h4 className="detail-block-title">Objekt & Zeitraum</h4>
                 <p className="detail-primary-text">{selectedAnfrageDetails.Objekte?.name}</p>
-                {selectedAnfrageDetails.ObjekteZusatz && (
-                  <p className="detail-secondary-text detail-secondary-text--bus">
-                    + Mitgebuchter Bus: {selectedAnfrageDetails.ObjekteZusatz.name}
-                  </p>
-                )}
                 <p className="detail-primary-text detail-primary-text--spaced">
                   📅 {selectedAnfrageDetails.anreise} bis {selectedAnfrageDetails.abreise}
                 </p>
@@ -670,7 +659,7 @@ export function Anfragen() {
 
                 <button
                   type="button"
-                  className="btn-primary btn-annehmen"
+                  className="btn-annehmen-modal"
                   onClick={() => handleOpenAnnehmenModal(selectedAnfrageDetails)}
                 >
                   Annehmen
@@ -686,8 +675,7 @@ export function Anfragen() {
           <div className="modal-content form-card modal-card--sm">
             <h3>Anfrage #{annehmenAnfrage.id} annehmen</h3>
             <p className="modal-delete-text modal-subtext--spaced">
-              Erstellt eine Buchung für {annehmenAnfrage.name} ({annehmenAnfrage.Objekte?.name}
-              {annehmenAnfrage.ObjekteZusatz ? ` + ${annehmenAnfrage.ObjekteZusatz.name}` : ""}).
+              Erstellt eine Buchung für {annehmenAnfrage.name} ({annehmenAnfrage.Objekte?.name}).
             </p>
 
             <div className="form-grid form-grid--spaced">

@@ -35,11 +35,6 @@ import { useToast } from "./useToast";
  * Gäste-Autofill aus der Gästeliste und echter Buchungs- statt
  * Anfragen-Semantik - hier landet am Ende eine unverbindliche Anfrage
  * im Backend statt direkt einer Buchung).
- *
- * Hinweis: Ein Zusatz-Bus kann hier NICHT mitangefragt werden - der
- * Bus lässt sich weiterhin nachträglich intern über die Buchungskarte
- * (BuchungskarteModal.jsx) zu einer bereits angenommenen Buchung
- * dazubuchen.
  */
 
 const OBJEKTE_API = "/api/objekte/oeffentlich";
@@ -51,7 +46,7 @@ const STANDARD_ABREISE_ZEIT = "17:00";
 
 /** Leeres Gästeformular als Ausgangs-/Reset-Zustand von Schritt 2. */
 const LEERES_GASTFORMULAR = {
-  name: "", email: "", telnr: "", strasse: "", hausnummer: "", plz: "", stadt: "", land: "Österreich",
+  name: "", email: "", telnr: "", strasse: "", hausnummer: "", plz: "", stadt: "", land: "Österreich", pkw:"",
 };
 
 /**
@@ -163,15 +158,13 @@ export function usePortalAnfrage() {
         const rohBelegungen = await belegungenRes.json();
         const flach = [];
         rohBelegungen.forEach((b) => {
-          [b.Objekte, b.ObjekteZusatz].forEach((obj) => {
-            if (!obj) return;
-            flach.push({
-              name: obj.name,
-              start: germanToISO(b.anreise),
-              end: germanToISO(b.abreise),
-              anreiseZeit: b.anreise_zeit,
-              abreiseZeit: b.abreise_zeit,
-            });
+          if (!b.Objekte) return;
+          flach.push({
+            name: b.Objekte.name,
+            start: germanToISO(b.anreise),
+            end: germanToISO(b.abreise),
+            anreiseZeit: b.anreise_zeit,
+            abreiseZeit: b.abreise_zeit,
           });
         });
         setBelegungen(flach);
@@ -616,6 +609,7 @@ export function usePortalAnfrage() {
         erwachsene: istWohnung(selectedObjekt?.name) ? guestCounts.erwachsene : null,
         kinder: istWohnung(selectedObjekt?.name) ? guestCounts.kinder : null,
         infos: nachricht || null,
+        pkw: gastData.pkw || "keine angegeben",
       };
 
       const response = await fetch(ANFRAGEN_API, {

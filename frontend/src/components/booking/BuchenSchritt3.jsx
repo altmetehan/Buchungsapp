@@ -153,8 +153,8 @@ export function BuchenSchritt3({ vm }) {
                 <input
                   type="text"
                   placeholder="z.B. DO-123AB"
-                  value={vm.bookingDetails.kennzeichen}
-                  onChange={(e) => vm.setBookingDetails({ ...vm.bookingDetails, kennzeichen: e.target.value })}
+                  value={vm.bookingDetails.pkw}
+                  onChange={(e) => vm.setBookingDetails({ ...vm.bookingDetails, pkw: e.target.value })}
                 />
               </div>
             </div>
