@@ -26,7 +26,6 @@ const MIT_BUCHUNG_GAST_UND_OBJEKT = {
       include: {
         Gaeste: true,
         Objekte: true,
-        ObjekteZusatz: true,
       },
     },
   },
@@ -35,9 +34,7 @@ const MIT_BUCHUNG_GAST_UND_OBJEKT = {
 /**
  * Eigener, vollständigerer Include NUR für die PDF-Routen -
  * MIT_BUCHUNG_GAST_UND_OBJEKT bleibt bewusst unverändert, damit sich am
- * normalen JSON-Response von GET / nichts ändert. Die PDF braucht
- * zusätzlich ObjekteZusatz (Kombibuchung Wohnung + Bus) und die
- * komplette Preisanpassungs-Historie.
+ * normalen JSON-Response von GET / nichts ändert. 
  */
 const MIT_VOLLSTAENDIGEN_BUCHUNGSDATEN = {
   include: {
@@ -45,7 +42,6 @@ const MIT_VOLLSTAENDIGEN_BUCHUNGSDATEN = {
       include: {
         Gaeste: true,
         Objekte: true,
-        ObjekteZusatz: true,
         Preisanpassungen: { orderBy: { erstellt_am: "asc" } },
       },
     },

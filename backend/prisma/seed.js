@@ -21,7 +21,6 @@ async function main() {
       checkin_zeit: "15:00",
       checkout_zeit: "11:00",
       mindest_naechte_wohnung: 2,
-      kombirabatt: 20,
       checkin_wochentag: "",
       checkout_wochentag: "",
     },
@@ -74,10 +73,10 @@ async function main() {
   const anfragenData = [
     { id: 1, anfrage_gast_id: 1, objekt_id: 1, anreise: "15.09.2026", abreise: "18.09.2026", anreise_zeit: "15:00", abreise_zeit: "11:00", erwachsene: 2, kinder: 0, infos: "Anreise am späten Nachmittag.", status: "angenommen", angenommen_am: new Date("2026-08-06T08:43:14Z") },
     { id: 2, anfrage_gast_id: 2, objekt_id: 4, anreise: "20.09.2026", abreise: "20.09.2026", anreise_zeit: "09:00", abreise_zeit: "17:00", infos: "Benötigen Kindersitz für den Bus.", status: "angenommen", angenommen_am: new Date("2026-08-06T08:43:59Z") },
-    { id: 3, anfrage_gast_id: 3, objekt_id: 2, objekt_id_2: 4, anreise: "01.10.2026", abreise: "05.10.2026", anreise_zeit: "15:00", abreise_zeit: "11:00", erwachsene: 4, kinder: 1, infos: "Anfrage inklusive Vito Bus.", status: "angenommen", angenommen_am: new Date("2026-08-06T08:44:11Z") },
+    { id: 3, anfrage_gast_id: 3, objekt_id: 2,  anreise: "01.10.2026", abreise: "05.10.2026", anreise_zeit: "15:00", abreise_zeit: "11:00", erwachsene: 4, kinder: 1, infos: "Anfrage inklusive Vito Bus.", status: "angenommen", angenommen_am: new Date("2026-08-06T08:44:11Z") },
     { id: 4, anfrage_gast_id: 4, objekt_id: 5, anreise: "10.09.2026", abreise: "10.09.2026", anreise_zeit: "10:00", abreise_zeit: "16:00", infos: "Firmenpräsentation im Forum.", status: "abgelehnt", ablehnungsgrund: "Raum bereits wegen Eigenbedarf reserviert." },
     { id: 5, anfrage_gast_id: 5, objekt_id: 3, anreise: "25.09.2026", abreise: "28.09.2026", anreise_zeit: "15:00", abreise_zeit: "11:00", erwachsene: 2, kinder: 0, infos: "Ruhiges Zimmer gewünscht.", status: "abgelehnt", ablehnungsgrund: "Keine Kapazitäten frei.", abgelehnt_am: new Date("2026-08-06T08:44:24Z") },
-    { id: 6, anfrage_gast_id: 6, objekt_id: 1, objekt_id_2: 4, anreise: "10.08.2026", abreise: "12.08.2026", anreise_zeit: "15:00", abreise_zeit: "11:00", erwachsene: 2, infos: "Ich liebe Beckhoff!", status: "angenommen", angenommen_am: new Date("2026-08-06T08:53:47Z") },
+    { id: 6, anfrage_gast_id: 6, objekt_id: 1,  anreise: "10.08.2026", abreise: "12.08.2026", anreise_zeit: "15:00", abreise_zeit: "11:00", erwachsene: 2, infos: "Ich liebe Beckhoff!", status: "angenommen", angenommen_am: new Date("2026-08-06T08:53:47Z") },
     { id: 7, anfrage_gast_id: 7, objekt_id: 4, anreise: "29.08.2026", abreise: "29.08.2026", anreise_zeit: "09:00", abreise_zeit: "17:00", status: "offen" },
     { id: 8, anfrage_gast_id: 6, objekt_id: 4, anreise: "29.08.2026", abreise: "29.08.2026", anreise_zeit: "09:00", abreise_zeit: "17:00", status: "offen" },
   ];
@@ -89,16 +88,16 @@ async function main() {
   // 7. Buchungen erstellen
   const buchungenData = [
     { id: 1, gast_id: 1, objekt_id: 1, anreise: "01.07.2026", abreise: "05.07.2026", anreise_zeit: "15:00", abreise_zeit: "11:00", erwachsene: 2, kinder: 0, preis: 400.0, infos: "Vergangene Buchung" },
-    { id: 2, gast_id: 2, objekt_id: 2, objekt_id_2: 4, anreise: "04.08.2026", abreise: "10.08.2026", anreise_zeit: "15:00", abreise_zeit: "11:00", erwachsene: 2, kinder: 1, preis: 780.0, infos: "Aktuelle Sommerbuchung" },
+    { id: 2, gast_id: 2, objekt_id: 2,  anreise: "04.08.2026", abreise: "10.08.2026", anreise_zeit: "15:00", abreise_zeit: "11:00", erwachsene: 2, kinder: 1, preis: 780.0, infos: "Aktuelle Sommerbuchung" },
     { id: 3, gast_id: 3, objekt_id: 4, anreise: "15.08.2026", abreise: "15.08.2026", anreise_zeit: "09:00", abreise_zeit: "17:00", preis: 24.0, infos: "Tagesausflug" },
     { id: 4, gast_id: 4, objekt_id: 3, anreise: "01.09.2026", abreise: "07.09.2026", anreise_zeit: "15:00", abreise_zeit: "11:00", erwachsene: 2, kinder: 0, preis: 540.0, infos: "Herbsturlaub" },
     { id: 5, gast_id: 5, objekt_id: 5, anreise: "12.09.2026", abreise: "12.09.2026", anreise_zeit: "08:00", abreise_zeit: "18:00", preis: 15.0, infos: "Workshop Tagung" },
     { id: 6, gast_id: 6, objekt_id: 1, anreise: "15.10.2026", abreise: "20.10.2026", anreise_zeit: "15:00", abreise_zeit: "11:00", erwachsene: 3, kinder: 0, preis: 550.0, infos: "Geschäftsreise" },
     { id: 7, gast_id: 7, objekt_id: 1, anreise: "15.09.2026", abreise: "18.09.2026", anreise_zeit: "15:00", abreise_zeit: "11:00", erwachsene: 2, kinder: 0, preis: 450.0, infos: "Anreise am späten Nachmittag." },
     { id: 8, gast_id: 8, objekt_id: 4, anreise: "20.09.2026", abreise: "20.09.2026", anreise_zeit: "09:00", abreise_zeit: "17:00", preis: 24.0, infos: "Benötigen Kindersitz für den Bus." },
-    { id: 9, gast_id: 9, objekt_id: 2, objekt_id_2: 4, anreise: "01.10.2026", abreise: "05.10.2026", anreise_zeit: "15:00", abreise_zeit: "11:00", erwachsene: 4, kinder: 1, preis: 700.8, infos: "Anfrage inklusive Vito Bus." },
+    { id: 9, gast_id: 9, objekt_id: 2,  anreise: "01.10.2026", abreise: "05.10.2026", anreise_zeit: "15:00", abreise_zeit: "11:00", erwachsene: 4, kinder: 1, preis: 700.8, infos: "Anfrage inklusive Vito Bus." },
     { id: 10, gast_id: 10, objekt_id: 1, anreise: "07.08.2026", abreise: "09.08.2026", anreise_zeit: "15:00", abreise_zeit: "11:00", erwachsene: 2, kinder: 0, preis: 220.0 },
-    { id: 11, gast_id: 11, objekt_id: 1, objekt_id_2: 4, anreise: "10.08.2026", abreise: "12.08.2026", anreise_zeit: "15:00", abreise_zeit: "11:00", erwachsene: 2, preis: 325.0, infos: "Ich liebe Beckhoff!" },
+    { id: 11, gast_id: 11, objekt_id: 1,  anreise: "10.08.2026", abreise: "12.08.2026", anreise_zeit: "15:00", abreise_zeit: "11:00", erwachsene: 2, preis: 325.0, infos: "Ich liebe Beckhoff!" },
   ];
 
   for (const b of buchungenData) {
