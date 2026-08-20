@@ -4,6 +4,7 @@ import "../styles/pageStyles/Rechnungen.css";
 import { Toast } from "../components/ui/Toast";
 import { useToast } from "../hooks/useToast";
 import { parseGermanDate } from "../utils/javaUtils";
+import { matchesSearchQuery } from "../utils/searchUtils";
 
 /**
  * @file Rechnungen.jsx
@@ -362,14 +363,13 @@ export function Rechnungen() {
       return istImAusgewaehltenMonat(res.datum);
     }
 
-    const searchWords = searchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean);
-    const rnrDarfMitsuchen = searchWords.length === 1;
-
-    const textFelder = [res.gast, res.objekt];
-    if (rnrDarfMitsuchen) textFelder.push(res.rnr);
-
-    const durchsuchbarerText = textFelder.filter(Boolean).join(" ").toLowerCase();
-    return searchWords.every((word) => durchsuchbarerText.includes(word));
+    return matchesSearchQuery(searchQuery, [
+      res.rnr,
+      res.gast,
+      res.objekt,
+      res.datum,
+      res.buchungId,
+    ]);
   });
 
   const gewaehlteBuchung = useMemo(

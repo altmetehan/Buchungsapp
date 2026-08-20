@@ -72,6 +72,9 @@ router.put("/", async (req, res) => {
         mindest_naechte_wohnung,
         checkin_wochentag: checkin_wochentag || "",
         checkout_wochentag: checkout_wochentag || "",
+        ortstaxe: parseFloat(ortstaxe) || 0,
+        mwst_ortstaxe: parseFloat(mwst_ortstaxe) || 0,
+        mwst_normal: parseFloat(mwst_normal) || 0,
       },
     });
     res.json(updated);

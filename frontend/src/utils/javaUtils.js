@@ -82,12 +82,13 @@ export const parseISO = (iso) => {
  * @param {string} germanStr - z.B. "14.07.2026"
  * @returns {string} z.B. "2026-07-14", oder "" bei ungültiger/leerer Eingabe.
  */
-export const germanToISO = (germanStr) => {
-  if (!germanStr) return "";
-  const parts = germanStr.split(".");
+export function germanToISO(dateStr) {
+  if (!dateStr) return "";
+  if (dateStr.includes("-")) return dateStr.split("T")[0];
+  const parts = dateStr.split(".");
   if (parts.length !== 3) return "";
   return `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
-};
+}
 
 /**
  * Wandelt einen deutschen Datumsstring "DD.MM.YYYY" in ein echtes

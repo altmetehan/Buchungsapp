@@ -44,6 +44,7 @@ function baueBuchungUpdateDaten(body) {
     "infos",
     "erwachsene",
     "kinder",
+    "pkw",
   ];
 
   const daten = {};

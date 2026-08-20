@@ -3,6 +3,7 @@ import { Toast } from "../components/ui/Toast";
 import { useToast } from "../hooks/useToast";
 import { useWebSocket } from "../hooks/useWebSocket";
 import { useEinstellungen } from "../hooks/useEinstellungen";
+import { matchesSearchQuery } from "../utils/searchUtils";
 import "../styles/shared-ui.css";
 import "../styles/pageStyles/Anfragen.css";
 
@@ -212,7 +213,19 @@ export function Anfragen() {
   const offeneAnfragen = useMemo(() => {
     return anfragen
       .filter((a) => a.status === "offen")
-      .filter((a) => matchesSearch(a, searchQuery));
+      .filter((a) =>
+        matchesSearchQuery(searchQuery, [
+          a.id,
+          a.name,
+          a.email,
+          a.telnr,
+          a.Objekte?.name,
+          a.infos,
+          a.anreise,
+          a.abreise,
+          a.pkw,
+        ])
+      );
   }, [anfragen, searchQuery]);
 
   const letzteEntschiedene = useMemo(() => {
@@ -224,7 +237,18 @@ export function Anfragen() {
       .filter((a) => a.status !== "offen")
       .filter((a) => {
         if (isSearching) {
-          return matchesSearch(a, searchQuery);
+          return matchesSearchQuery(searchQuery, [
+            a.id,
+            a.name,
+            a.email,
+            a.telnr,
+            a.Objekte?.name,
+            a.infos,
+            a.anreise,
+            a.abreise,
+            a.ablehnungsgrund,
+            a.pkw,
+          ]);
         }
         const entscheidungsDatum = new Date(a.angenommen_am || a.abgelehnt_am);
         return entscheidungsDatum >= vorDreiTagen;

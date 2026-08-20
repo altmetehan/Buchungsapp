@@ -159,7 +159,7 @@ export function BuchenSchritt3({ vm }) {
                   />
                 </div>
               ) : (
-                <div></div>
+                  {}
               )}
 
             </div>

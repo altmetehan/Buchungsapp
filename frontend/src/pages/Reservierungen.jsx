@@ -3,6 +3,7 @@ import { BuchungskarteModal } from "../components/BuchungskarteModal";
 import { Toast } from "../components/ui/Toast";
 import { useToast } from "../hooks/useToast";
 import { istStundenbasiert, germanToISO, parseGermanDate } from "../utils/javaUtils";
+import { matchesSearchQuery } from "../utils/searchUtils";
 import "../styles/shared-ui.css";
 import "../styles/pageStyles/Reservierungen.css";
 
@@ -180,35 +181,18 @@ export function Reservierungen() {
   }, [reservations]);
 
   const filteredReservations = useMemo(() => {
-    const searchWords = searchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean);
-    if (searchWords.length === 0) return reservationsWithSortDate;
-
-    const idDarfMitsuchen = searchWords.length === 1;
-
-    return reservationsWithSortDate.filter((res) => {
-      const pkwClean = res.pkw ? res.pkw.replace(/[-\s]/g, "").toLowerCase() : "";
-
-      const textFelder = [
+    return reservationsWithSortDate.filter((res) =>
+      matchesSearchQuery(searchQuery, [
+        res.id,
         res.name,
         res.resource,
         res.email,
         res.infos,
         res.checkIn,
         res.checkOut,
-        pkwClean,
-      ];
-      if (idDarfMitsuchen) textFelder.push(res.id?.toString());
-
-      const durchsuchbarerText = textFelder.filter(Boolean).join(" ").toLowerCase();
-
-      return searchWords.every((word) => {
-        if (/^\d+$/.test(word)) {
-          const regex = new RegExp(`\\b${word}\\b`, "i");
-          return regex.test(durchsuchbarerText);
-        }
-        return durchsuchbarerText.includes(word);
-      });
-    });
+        res.pkw,
+      ])
+    );
   }, [reservationsWithSortDate, searchQuery]);
 
   let daysToDisplay = [];

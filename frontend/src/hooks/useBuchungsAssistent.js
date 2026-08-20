@@ -708,7 +708,7 @@ export function useBuchungsAssistent() {
         abreise: formatDe(dateRange.end),
         infos: bookingDetails.info || null,
         preis: endpreisZahl,
-        pkw: bookingDetails.pkw || istHauptobjektStundenbasiert ? null : "keine angegeben",
+        pkw: istHauptobjektStundenbasiert ? null : (bookingDetails.pkw?.trim() || "keine angegeben"),        
         erwachsene: istWohnung(selectedObjekt?.name) ? guestCounts.erwachsene : null,
         kinder: istWohnung(selectedObjekt?.name) ? guestCounts.kinder : null,
       };
@@ -798,18 +798,6 @@ export function useBuchungsAssistent() {
       setDateRange({ start: clickedDate, end: null });
       setHoveredDate(null);
     
-    }
-
-    // In Schritt 1 (noch kein Objekt ausgewählt):
-    if (dateRange.start && !dateRange.end) {
-      if (clickedDate < dateRange.start) {
-        setDateRange({ start: clickedDate, end: null });
-      } else {
-        setDateRange({ start: dateRange.start, end: clickedDate });
-      }
-    } else {
-      setDateRange({ start: clickedDate, end: null });
-      setHoveredDate(null);
     }
   };
 

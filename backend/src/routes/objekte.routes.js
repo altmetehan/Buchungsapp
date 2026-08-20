@@ -120,7 +120,7 @@ router.delete("/:id", async (req, res) => {
     const betroffeneBuchungen = await prisma.buchungen.findMany({
       where: {
         geloescht_am: null,
-        OR: [{ objekt_id: objektId }, { objekt_id_2: objektId }],
+        objekt_id: objektId,
       },
     });
 

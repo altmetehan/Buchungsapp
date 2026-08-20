@@ -3,6 +3,7 @@ import { CountryDropdown } from "../components/ui/CountryDropdown";
 import { Toast } from "../components/ui/Toast";
 import { useToast } from "../hooks/useToast";
 import { validateForm, required, isEmail } from "../utils/validation";
+import { matchesSearchQuery } from "../utils/searchUtils";
 import "../styles/shared-ui.css";
 import "../styles/pageStyles/Gaeste.css";
 
@@ -87,19 +88,19 @@ export function Gaeste() {
    * Filtert Gäste basierend auf dem aktuellen Suchbegriff across all attributes.
    */
   const filteredGuests = useMemo(() => {
-    return guests.filter((res) => {
-      const search = searchQuery.toLowerCase();
-      return (
-        res.id?.toString().includes(search) ||
-        res.name?.toLowerCase().includes(search) ||
-        res.email?.toLowerCase().includes(search) ||
-        res.strasse?.toLowerCase().includes(search) ||
-        res.hnr?.toLowerCase().includes(search) ||
-        res.stadt?.toLowerCase().includes(search) ||
-        res.telnr?.toString().toLowerCase().includes(search) ||
-        res.plz?.toString().includes(search)
-      );
-    });
+    return guests.filter((guest) =>
+      matchesSearchQuery(searchQuery, [
+        guest.id,
+        guest.name,
+        guest.email,
+        guest.telnr,
+        guest.strasse,
+        guest.hnr,
+        guest.plz,
+        guest.stadt,
+        guest.land,
+      ])
+    );
   }, [guests, searchQuery]);
 
   /**

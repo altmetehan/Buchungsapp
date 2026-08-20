@@ -1,5 +1,5 @@
 import "../styles/shared-ui.css";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   istStundenbasiert,
   ueberschneidenSich,
@@ -24,9 +24,6 @@ import { useEinstellungen } from "../hooks/useEinstellungen";
 
 /** Endpunkt für Buchungs-API-Operationen */
 const BUCHUNGEN_API = "/api/buchungen";
-
-/** Endpunkt für Objekt-Stammdaten */
-const OBJEKTE_API = "/api/objekte";
 
 /**
  * Formatiert eine Zahl oder einen Betrag als deutschen Währungsstring (z. B. "1.234,50 €").
@@ -77,7 +74,8 @@ const toIsoDate = (dateStr) => {
 const toGermanDate = (isoStr) => {
   if (!isoStr) return "";
   if (isoStr.includes(".")) return isoStr;
-  const [y, m, d] = isoStr.split("-");
+  const cleanIso = isoStr.split("T")[0];
+  const [y, m, d] = cleanIso.split("-");
   return `${d}.${m}.${y}`;
 };
 
@@ -185,21 +183,14 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
   const [isEditing, setIsEditing] = useState(false);
   /** Steuert die Sicherheitsabfrage für die Stornierung */
   const [showConfirm, setShowConfirm] = useState(false);
-
-  /** Liste aller Mietobjekte (Wohnungen, Busse etc.) */
-  const [objekte, setObjekte] = useState([]);
+  
   /** Liste aller Buchungen zur Kollisions- und Verfügbarkeitsprüfung */
   const [buchungen, setBuchungen] = useState([]);
 
   /**
-   * Lädt initiale Objekt- und Buchungsdaten beim Mounten der Komponente.
+   * Lädt initiale Buchungsdaten beim Mounten der Komponente.
    */
   useEffect(() => {
-    fetch(OBJEKTE_API)
-      .then((res) => (res.ok ? res.json() : []))
-      .then(setObjekte)
-      .catch((err) => console.error("Fehler beim Laden der Objekte:", err));
-
     fetch(BUCHUNGEN_API)
       .then((res) => (res.ok ? res.json() : []))
       .then(setBuchungen)
@@ -233,9 +224,6 @@ export function BuchungskarteModal({ reservation, onClose, onDeleted, onUpdated 
   const [dateWarnung, setDateWarnung] = useState(null);
   /** Status während der asynchronen Verfügbarkeitsprüfung */
   const [pruefeLaeuft, setPruefeLaeuft] = useState(false);
-
-  // Auflösung des Objektnamens
-  const hauptobjektName = reservation?.hauptobjektName || reservation?.rawBooking?.Objekte?.name;
 
   if (!reservation) return null;
 

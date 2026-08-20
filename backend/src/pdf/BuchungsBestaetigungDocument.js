@@ -646,5 +646,4 @@ export function BuchungsbestaetigungDocument({
   );
 }
 
-export const BuchungsBestaetigungDocument = BuchungsbestaetigungDocument;
 export default BuchungsbestaetigungDocument;
